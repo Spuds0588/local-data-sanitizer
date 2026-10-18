@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import Header from '../Header.jsx';
+import ShareBar from '../ShareBar.jsx';
 import FilesStep from '../FilesStep.jsx';
 import RulesStep from '../RulesStep.jsx';
 import ReviewStep from '../ReviewStep.jsx';
@@ -21,6 +22,22 @@ describe('Header', () => {
     const active = render(<Header onRestart={noop} canRestart />);
     expect(active).toContain('Start over');
     expect(active).not.toContain('disabled=""');
+  });
+});
+
+describe('ShareBar', () => {
+  it('links to the repository and offers a copy-link action', () => {
+    const html = render(<ShareBar />);
+    expect(html).toContain('free and open source');
+    expect(html).toContain('https://github.com/Spuds0588/local-data-sanitizer');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('Star the repo');
+    expect(html).toContain('Copy link');
+  });
+
+  it('hides the native share action when the browser has no share API', () => {
+    expect(render(<ShareBar />)).not.toContain('Share</button>');
   });
 });
 

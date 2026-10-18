@@ -82,6 +82,29 @@ export const ShieldIcon = (p) => (
   </Svg>
 );
 
+export const StarIcon = (p) => (
+  <Svg {...p}>
+    <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.9z" />
+  </Svg>
+);
+
+export const LinkIcon = (p) => (
+  <Svg {...p}>
+    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+  </Svg>
+);
+
+export const ShareIcon = (p) => (
+  <Svg {...p}>
+    <circle cx="18" cy="5" r="2.5" />
+    <circle cx="6" cy="12" r="2.5" />
+    <circle cx="18" cy="19" r="2.5" />
+    <path d="m8.2 10.8 7.6-4.6" />
+    <path d="m8.2 13.2 7.6 4.6" />
+  </Svg>
+);
+
 export const RestartIcon = (p) => (
   <Svg {...p}>
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

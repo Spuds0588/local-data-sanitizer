@@ -4,6 +4,7 @@ import StepNav from './components/StepNav.jsx';
 import FilesStep from './components/FilesStep.jsx';
 import RulesStep from './components/RulesStep.jsx';
 import ReviewStep from './components/ReviewStep.jsx';
+import ShareBar from './components/ShareBar.jsx';
 import { ArrowLeftIcon, ArrowRightIcon } from './components/Icons.jsx';
 import { findStep, isStepAvailable, STEPS } from './lib/wizard.js';
 import { useSanitizer } from './state/useSanitizer.js';
@@ -90,6 +91,8 @@ export default function App() {
         <p className="mt-6 text-[11px] text-neutral-400">
           Nothing is uploaded. PDFs export as plain .txt; everything else keeps its format.
         </p>
+
+        <ShareBar />
       </main>
     </div>
   );
