@@ -68,6 +68,15 @@ export function useSanitizer() {
     setStatus('idle');
   }, []);
 
+  // "Start over" also clears error banners, keeping the rules profile intact.
+  const restart = useCallback(() => {
+    setFiles([]);
+    setEntries([]);
+    setDownloads([]);
+    setErrors([]);
+    setStatus('idle');
+  }, []);
+
   // Re-scan whenever files or rules change (debounced so typing a keyword is cheap).
   useEffect(() => {
     if (files.length === 0) {
@@ -199,6 +208,7 @@ export function useSanitizer() {
     addFiles,
     removeFile,
     clearAll,
+    restart,
     toggleEntry,
     setFakeValue,
     setAllEnabled,

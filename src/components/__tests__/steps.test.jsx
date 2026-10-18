@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
+import Header from '../Header.jsx';
 import FilesStep from '../FilesStep.jsx';
 import RulesStep from '../RulesStep.jsx';
 import ReviewStep from '../ReviewStep.jsx';
@@ -10,6 +11,18 @@ const noop = () => {};
 // React SSR separates adjacent text nodes with comment markers; strip them so
 // assertions read like the text a user actually sees.
 const render = (el) => renderToString(el).replaceAll('<!-- -->', '');
+
+describe('Header', () => {
+  it('offers a restart control only once there is a session to clear', () => {
+    const idle = render(<Header onRestart={noop} canRestart={false} />);
+    expect(idle).toContain('Start over');
+    expect(idle).toContain('disabled=""');
+
+    const active = render(<Header onRestart={noop} canRestart />);
+    expect(active).toContain('Start over');
+    expect(active).not.toContain('disabled=""');
+  });
+});
 
 describe('FilesStep', () => {
   it('lists files with sizes and a remove control', () => {

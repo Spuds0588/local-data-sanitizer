@@ -17,6 +17,11 @@ describe('App shell', () => {
     }
   });
 
+  it('exposes a start-over control that waits for a loaded file', () => {
+    expect(html).toContain('Start over');
+    expect(html).toContain('disabled:cursor-not-allowed');
+  });
+
   it('opens on the upload step', () => {
     expect(html).toContain('Drop files or click to browse');
     expect(html).toContain('MB each');

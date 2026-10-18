@@ -19,6 +19,11 @@ export default function App() {
   const next = findStep(current, 1, context);
   const key = STEPS[current].key;
 
+  const restart = () => {
+    s.restart();
+    setStep(0);
+  };
+
   const panel = {
     files: (
       <FilesStep
@@ -55,7 +60,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <Header />
+      <Header onRestart={restart} canRestart={s.files.length > 0} />
       <StepNav current={current} context={context} onGo={setStep} />
 
       <main className="mx-auto max-w-3xl px-6 py-8">

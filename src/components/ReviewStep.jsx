@@ -77,7 +77,7 @@ export default function ReviewStep({ entries, enabledCount, status, downloads, o
                   </td>
                   <td className="px-3 py-2">
                     <span
-                      className="border border-white px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                      className="whitespace-nowrap border border-white px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
                       title={entry.derivedFrom ? `Part of "${entry.derivedFrom}"` : undefined}
                     >
                       {TYPE_LABEL[entry.type] || entry.type}
