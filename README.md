@@ -4,6 +4,8 @@
 
 No install, no sign-up. Your files never leave the browser tab.
 
+Mirror of the same build: <https://site-d79ea1db703144e5bd1460e66093994b.freebuff.page>
+
 ---
 
 A **browser-only** Single Page Application that parses, redacts and replaces PII and
