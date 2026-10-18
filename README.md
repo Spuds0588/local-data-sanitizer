@@ -51,6 +51,14 @@ npm run build    # static output in dist/
 - **GitHub Pages (primary):** <https://spuds0588.github.io/local-data-sanitizer/> —
   every push to `main` runs `.github/workflows/deploy.yml`, which builds with
   `VITE_BASE_PATH=/local-data-sanitizer/` and publishes `dist/`.
+
+  **One-time setup:** the repository must publish from Actions, not from a branch.
+  Set [Settings → Pages → Build and deployment → Source][pages-source] to
+  **GitHub Actions**. While it is still set to *Deploy from a branch*, GitHub
+  rebuilds the repo root on every push and serves `index.html` verbatim, which
+  points at the unbundled `/src/main.jsx` and renders a blank page.
+
+[pages-source]: https://github.com/Spuds0588/local-data-sanitizer/settings/pages
 - **Any static host:** `npm run build` produces a self-contained `dist/` folder.
 
 ## Known limitations (V1)

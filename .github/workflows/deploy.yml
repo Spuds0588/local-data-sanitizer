@@ -29,27 +29,6 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /local-data-sanitizer/
-      # A site created by the legacy "deploy from a branch" flow keeps rebuilding
-      # the repo root (raw /src/main.jsx) and would overwrite the artifact below.
-      # Flip the site to Actions publishing once; this is a no-op afterwards.
-      - name: Publish Pages from GitHub Actions
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            let buildType = null;
-            try {
-              const { data } = await github.request('GET /repos/{owner}/{repo}/pages', { owner, repo });
-              buildType = data.build_type;
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
-            if (buildType === 'workflow') {
-              core.info('Pages already publishes from GitHub Actions; nothing to change.');
-            } else {
-              core.info(`Pages build_type is ${buildType ?? 'unset'}; switching to workflow builds.`);
-              await github.request('PUT /repos/{owner}/{repo}/pages', { owner, repo, build_type: 'workflow' });
-            }
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
