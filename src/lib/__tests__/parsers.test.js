@@ -107,10 +107,13 @@ describe('end-to-end via engine (docx)', () => {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
     const found = await analyzeFiles([file], { rules: {}, customKeywords: ['Project Phoenix'] });
-    expect(found).toHaveLength(1);
+    // The keyword plus its derived "Phoenix" sub-string entry.
+    expect(found).toHaveLength(2);
+    expect(found.some((e) => e.original === 'Phoenix')).toBe(true);
     const [result] = await sanitizeFiles([file], found);
     const outZip = await JSZip.loadAsync(await result.blob.arrayBuffer());
     const xml = await outZip.file('word/document.xml').async('string');
     expect(xml).not.toContain('Project Phoenix');
+    expect(xml).not.toContain('Phoenix');
   });
 });

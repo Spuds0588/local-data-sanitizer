@@ -26,7 +26,18 @@ export function fakeCustom(original) {
   const hasKeepWord = tokens.some((t) => KEEP_WORDS.has(t.toLowerCase()));
 
   if (allCapitalized && !hasKeepWord) {
-    return faker.person.fullName();
+    // Keep the token count stable: the engine maps each original token to the
+    // matching fake token so "Smith" alone becomes the right surname later.
+    const first = faker.person.firstName();
+    const last = faker.person.lastName();
+    if (tokens.length === 2) return `${first} ${last}`;
+    return tokens
+      .map((_, i) => {
+        if (i === 0) return first;
+        if (i === tokens.length - 1) return last;
+        return faker.person.middleName();
+      })
+      .join(' ');
   }
 
   return tokens
@@ -44,6 +55,8 @@ export function fakeCustom(original) {
     .join(' ');
 }
 
+const lastFour = (value) => String(value).replace(/\D/g, '').slice(-4);
+
 const FACTORIES = {
   email: () => faker.internet.email().toLowerCase(),
   phone: () => faker.helpers.replaceSymbols('(###) ###-####'),
@@ -53,7 +66,23 @@ const FACTORIES = {
     const serial = faker.number.int({ min: 1000, max: 9999 });
     return `${area}-${group}-${serial}`;
   },
-  creditCard: () => faker.finance.creditCardNumber(),
+  creditCard: (original) => {
+    // Never keep the real trailing digits: "ending in 1234" must not survive.
+    const originalLastFour = lastFour(original);
+    let candidate = faker.finance.creditCardNumber();
+    for (let i = 0; i < 10 && lastFour(candidate) === originalLastFour; i += 1) {
+      candidate = faker.finance.creditCardNumber();
+    }
+    return candidate;
+  },
+  creditCardPartial: (original) => {
+    const originalLastFour = lastFour(original);
+    let candidate = String(faker.number.int({ min: 1000, max: 9999 }));
+    for (let i = 0; i < 10 && candidate === originalLastFour; i += 1) {
+      candidate = String(faker.number.int({ min: 1000, max: 9999 }));
+    }
+    return candidate;
+  },
   custom: fakeCustom,
 };
 

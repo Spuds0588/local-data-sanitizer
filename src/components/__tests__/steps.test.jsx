@@ -49,6 +49,7 @@ describe('RulesStep', () => {
     );
     expect(html).toContain('Email addresses');
     expect(html).toContain('Credit card numbers');
+    expect(html).toContain('Card fragments (masked / last four)');
     expect(html).toContain('role="checkbox"');
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain('Custom keywords');

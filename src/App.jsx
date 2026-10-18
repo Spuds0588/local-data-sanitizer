@@ -59,14 +59,14 @@ export default function App() {
       <StepNav current={current} context={context} onGo={setStep} />
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <div className="border border-black p-5">{panel}</div>
+        <div className="border border-white p-5">{panel}</div>
 
         <div className="mt-5 flex items-center gap-2">
           {previous !== current && (
             <button
               type="button"
               onClick={() => setStep(previous)}
-              className="flex items-center gap-1.5 border border-black px-3 py-2 text-[10px] uppercase tracking-widest hover:bg-black hover:text-white"
+              className="flex items-center gap-1.5 border border-white px-3 py-2 text-[10px] uppercase tracking-widest hover:bg-white hover:text-black"
             >
               <ArrowLeftIcon size={12} /> Back
             </button>
@@ -75,14 +75,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setStep(next)}
-              className="ml-auto flex items-center gap-1.5 border border-black bg-black px-3 py-2 text-[10px] uppercase tracking-widest text-white hover:bg-white hover:text-black"
+              className="ml-auto flex items-center gap-1.5 border border-white bg-white px-3 py-2 text-[10px] uppercase tracking-widest text-black hover:bg-black hover:text-white"
             >
               Next <ArrowRightIcon size={12} />
             </button>
           )}
         </div>
 
-        <p className="mt-6 text-[11px] text-neutral-500">
+        <p className="mt-6 text-[11px] text-neutral-400">
           Nothing is uploaded. PDFs export as plain .txt; everything else keeps its format.
         </p>
       </main>

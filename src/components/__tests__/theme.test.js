@@ -19,6 +19,13 @@ function sourceFiles(dir, out = []) {
 }
 
 describe('black and white theme', () => {
+  it('inverts the page: black base, white ink', () => {
+    const css = readFileSync('src/index.css', 'utf8');
+    expect(css).toMatch(/color-scheme:\s*dark/);
+    expect(css).toMatch(/background:\s*#000000/);
+    expect(css).toMatch(/color:\s*#ffffff/);
+  });
+
   it('uses no colored utility classes anywhere in src/', () => {
     const offenders = [];
     for (const file of sourceFiles('src')) {

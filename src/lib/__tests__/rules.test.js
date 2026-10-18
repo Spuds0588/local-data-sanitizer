@@ -49,4 +49,34 @@ describe('detectInText', () => {
   it('gives non-empty digit counts for validation helpers', () => {
     expect(digitCount('(555) 123-4567')).toBe(10);
   });
+
+  it('leaves transaction and account numbers alone instead of calling them phones', () => {
+    const cfg = { rules: { phone: true }, customKeywords: [] };
+    expect(detectInText('TXN 4509123456789012', cfg)).toHaveLength(0);
+    expect(detectInText('reference 4509-1234-5678-9012', cfg)).toHaveLength(0);
+    expect(detectInText('invoice 1234567890', cfg)).toHaveLength(0);
+  });
+
+  it('still accepts real phone formats', () => {
+    const cfg = { rules: { phone: true }, customKeywords: [] };
+    expect(detectInText('call 555-123-4567', cfg)).toHaveLength(1);
+    expect(detectInText('call +1 (555) 123-4567', cfg)).toHaveLength(1);
+    expect(detectInText('call 555.123.4567', cfg)).toHaveLength(1);
+  });
+
+  it('flags masked and last-four card fragments', () => {
+    const cfg = { rules: { creditCardPartial: true }, customKeywords: [] };
+    expect(detectInText('card **** **** **** 4242', cfg)[0].value).toBe('**** **** **** 4242');
+    expect(detectInText('on file: xxxx-xxxx-xxxx-4242', cfg)[0].value).toBe('xxxx-xxxx-xxxx-4242');
+    expect(detectInText('ends in 4242', cfg)[0].value).toBe('ends in 4242');
+    expect(detectInText('last four digits: 4242', cfg)[0].value).toBe('last four digits: 4242');
+  });
+
+  it('does not double-report a full card number as a fragment', () => {
+    const found = detectInText('4111 1111 1111 1111', {
+      rules: { creditCard: true, creditCardPartial: true },
+      customKeywords: [],
+    });
+    expect(found.map((m) => m.type)).toEqual(['creditCard']);
+  });
 });

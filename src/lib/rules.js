@@ -52,19 +52,38 @@ export const RULE_DEFS = {
     pattern: /\b(?:\d[ -]?){12,18}\d\b/g,
     validate: luhnValid,
   },
+  creditCardPartial: {
+    id: 'creditCardPartial',
+    label: 'Card fragments (masked / last four)',
+    hint: '**** **** **** 1234, ending in 1234',
+    priority: 4,
+    caseInsensitive: false,
+    patterns: [
+      // **** **** **** 1234, xxxx-xxxx-xxxx-1234, ••••••••••••1234
+      /[*xX•·]{4}(?:[\s-]?[*xX•·]{4}){2}[\s-]?\d{4}(?!\d)/g,
+      // "ending in 1234" / "ends with 1234"
+      /\b(?:ending|ends)\s+(?:in|with)\s+\d{4}(?!\d)/gi,
+      // "last four digits: 1234"
+      /\blast\s+(?:four|4)\s+(?:digits|numbers?)(?:\s*(?:are|is|:|=|#|-))?\s*\d{4}(?!\d)/gi,
+    ],
+  },
   phone: {
     id: 'phone',
     label: 'Phone numbers (US)',
-    hint: '(555) 123-4567, +1 555 123 4567',
-    priority: 4,
+    hint: '(555) 123-4567, 555-123-4567, +1 555 123 4567',
+    priority: 5,
     caseInsensitive: false,
-    pattern: /(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}\b/g,
+    // Deliberately stricter than a bare \d{10}: a separator (or parentheses)
+    // must be present, so transaction/account numbers are not mistaken for
+    // phone numbers. Lookarounds keep matches out of longer digit runs.
+    pattern:
+      /(?<!\w)(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-])\d{3}[\s.-]?\d{4}(?!\w)/g,
     validate: (v) => digitCount(v) >= 10 && digitCount(v) <= 11,
   },
 };
 
 export const DEFAULT_CONFIG = {
-  rules: { email: true, phone: true, ssn: true, creditCard: true },
+  rules: { email: true, phone: true, ssn: true, creditCard: true, creditCardPartial: true },
   customKeywords: [],
 };
 
@@ -117,19 +136,21 @@ export function detectInText(text, config = DEFAULT_CONFIG) {
     .sort((a, b) => a.priority - b.priority);
 
   for (const def of active) {
-    const re = new RegExp(def.pattern.source, def.pattern.flags);
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      const start = m.index;
-      const end = start + m[0].length;
-      if (end === start) {
-        re.lastIndex += 1;
-        continue;
+    for (const pattern of def.patterns || [def.pattern]) {
+      const re = new RegExp(pattern.source, pattern.flags);
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const start = m.index;
+        const end = start + m[0].length;
+        if (end === start) {
+          re.lastIndex += 1;
+          continue;
+        }
+        if (def.validate && !def.validate(m[0])) continue;
+        if (isTaken(used, start, end)) continue;
+        markUsed(used, start, end);
+        out.push({ type: def.id, value: text.slice(start, end), start, end });
       }
-      if (def.validate && !def.validate(m[0])) continue;
-      if (isTaken(used, start, end)) continue;
-      markUsed(used, start, end);
-      out.push({ type: def.id, value: text.slice(start, end), start, end });
     }
   }
 

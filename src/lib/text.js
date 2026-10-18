@@ -35,9 +35,13 @@ export function replaceAll(text, search, replacement, caseInsensitive = false) {
  */
 export function applyEntriesToText(text, entries, opts = {}) {
   const { xmlSafe = false } = opts;
+  // Longest originals first, so "John Smith" is replaced as a unit before the
+  // derived "John"/"Smith" sub-strings get a chance to break it apart.
+  const active = entries
+    .filter((entry) => entry && entry.enabled !== false && entry.original)
+    .sort((a, b) => b.original.length - a.original.length);
   let out = text;
-  for (const entry of entries) {
-    if (!entry || entry.enabled === false) continue;
+  for (const entry of active) {
     const ci = entry.type === 'custom' || entry.type === 'email';
     const value = xmlSafe ? escapeXml(entry.fakeValue) : entry.fakeValue;
     out = replaceAll(out, entry.original, value, ci);

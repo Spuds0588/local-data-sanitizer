@@ -17,14 +17,19 @@ the browser tab. There is no backend and no third-party API call.
 
 ## Interface
 
-A three-step wizard — **Files → Rules → Review** — in a strict black-and-white theme with
+A three-step wizard — **Files → Rules → Review** — on a black canvas with white ink and
 minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, no color.
 
 ## Features
 
 - **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.json`, `.pdf` (25 MB per file).
-- **Rules engine:** toggle standard detectors (email, phone, SSN, credit-card with Luhn
-  check) and add your own secret keywords ("Project Phoenix", "Elon Musk", …).
+- **Rules engine:** toggle standard detectors (email, phone, SSN, Luhn-checked cards, and
+  masked/last-four card fragments) and add your own secret keywords ("Project Phoenix",
+  "Elon Musk", …).
+- **Name variants:** a multi-word keyword like `John Smith` also redacts bare `John`,
+  `Smith` and `JohnSmith`, each mapped to the matching token of the same fake name.
+- **Few false positives:** phone matching requires real separators, so transaction and
+  account numbers are left alone, and card fragments reuse the last four of the fake card.
 - **Referential integrity:** every unique original maps to exactly one fake value for the
   whole session, so `John Doe` always becomes the same fake name and LLM context survives.
 - **Snippet reviewer:** inspect each match in context, include/exclude it, or hand-edit the

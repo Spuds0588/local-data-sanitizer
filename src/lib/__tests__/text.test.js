@@ -26,6 +26,14 @@ describe('text helpers', () => {
     expect(escapeXml('a&b')).toBe('a&amp;b');
   });
 
+  it('replaces the longest original first so a sub-string cannot break a full name', () => {
+    const entries = [
+      { type: 'custom', original: 'John', fakeValue: 'Ada', enabled: true },
+      { type: 'custom', original: 'John Smith', fakeValue: 'Ada Lovelace', enabled: true },
+    ];
+    expect(applyEntriesToText('John Smith', entries)).toBe('Ada Lovelace');
+  });
+
   it('names sanitized outputs', () => {
     expect(sanitizedName('report.docx', 'docx')).toBe('report.sanitized.docx');
     expect(sanitizedName('data.v2.csv', 'csv')).toBe('data.v2.sanitized.csv');
