@@ -1,2 +1,61 @@
-# local-data-sanitizer
-browser-based Single Page Application (SPA) designed to parse, redact, and replace Personally Identifiable Information (PII) and company secrets from documents using realistic fake data. 
+# local-data-sanitizer · "Scrub-Hub"
+
+### ▶ **[Open the live app →](https://spuds0588.github.io/local-data-sanitizer/)**
+
+No install, no sign-up. Your files never leave the browser tab.
+
+---
+
+A **browser-only** Single Page Application that parses, redacts and replaces PII and
+company secrets in your documents with realistic fake data — so you can safely feed
+proprietary files to LLM coding agents without leaking anything.
+
+Nothing is ever uploaded: all parsing, matching and fake-data generation happens in
+the browser tab. There is no backend and no third-party API call.
+
+## Interface
+
+A three-step wizard — **Files → Rules → Review** — in a strict black-and-white theme with
+minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, no color.
+
+## Features
+
+- **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.json`, `.pdf` (25 MB per file).
+- **Rules engine:** toggle standard detectors (email, phone, SSN, credit-card with Luhn
+  check) and add your own secret keywords ("Project Phoenix", "Elon Musk", …).
+- **Referential integrity:** every unique original maps to exactly one fake value for the
+  whole session, so `John Doe` always becomes the same fake name and LLM context survives.
+- **Snippet reviewer:** inspect each match in context, include/exclude it, or hand-edit the
+  replacement before exporting.
+- **Reusable profiles:** export your rules to `rules.json` and import them later.
+- **Local download:** sanitized files are generated as blobs and downloaded; PDFs export as
+  `.txt` (V1 does not preserve PDF visual layout), DOCX/XLSX keep their structure.
+
+## Stack
+
+React 19 + Vite (SPA) · TailwindCSS v4 (grayscale-only utilities) · [`@faker-js/faker`](https://fakerjs.dev) ·
+[`jszip`](https://stuk.github.io/jszip/) · [`xlsx` (SheetJS)](https://sheetjs.com) ·
+[`pdfjs-dist`](https://mozilla.github.io/pdf.js/).
+
+## Develop
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # unit tests (vitest)
+npm run build    # static output in dist/
+```
+
+## Deploy
+
+- **GitHub Pages (primary):** <https://spuds0588.github.io/local-data-sanitizer/> —
+  every push to `main` runs `.github/workflows/deploy.yml`, which builds with
+  `VITE_BASE_PATH=/local-data-sanitizer/` and publishes `dist/`.
+- **Any static host:** `npm run build` produces a self-contained `dist/` folder.
+
+## Known limitations (V1)
+
+- PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
+- DOCX replacement edits `word/document.xml` text nodes; PII split across multiple Word
+  runs may not be caught, and headers/footers are not scanned yet.
+- SheetJS export re-creates the workbook, so exotic cell styling is not preserved.
