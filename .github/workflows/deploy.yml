@@ -44,11 +44,35 @@ jobs:
       # If Pages is still set to "Deploy from a branch", GitHub rebuilds the
       # repo root after this workflow finishes and serves index.html verbatim
       # (which points at /src/main.jsx) - a blank page. Pinning the source to
-      # Actions keeps the published dist/ artifact live.
+      # Actions keeps the published dist/ artifact live. This is best effort:
+      # the API call needs repository admin, which GITHUB_TOKEN may not have.
       - name: Point Pages at GitHub Actions
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow --jq '.build_type'
+        run: |
+          for attempt in 1 2 3; do
+            if gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow --jq '.build_type'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::Could not switch Pages to Actions. Set Settings -> Pages -> Source to GitHub Actions."
+          exit 1
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Check the live page
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          # Give a branch build triggered by this same push time to land, so a
+          # regression is visible in the run instead of a minute later.
+          sleep 60
+          html=$(curl -fsSL "$PAGE_URL")
+          if printf '%s' "$html" | grep -q '/src/main.jsx'; then
+            echo "::warning::$PAGE_URL is serving the branch root, not this deployment. Set Settings -> Pages -> Source to GitHub Actions."
+            exit 1
+          fi
+          echo "$PAGE_URL serves the bundled build."
