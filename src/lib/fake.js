@@ -1,6 +1,7 @@
 // Deterministic-per-entry fake value generation, one type per detector.
 
 import { faker } from '@faker-js/faker';
+import { jiggleAmount } from './jiggle.js';
 
 // Words we keep when faking a custom "codename" (e.g. "Project Phoenix" -> "Project Alpha").
 const KEEP_WORDS = new Set([
@@ -84,6 +85,8 @@ const FACTORIES = {
     return candidate;
   },
   custom: fakeCustom,
+  // Not a fake identity: the same shape with a value shifted by up to ±20%.
+  amount: (original) => jiggleAmount(original),
 };
 
 /**

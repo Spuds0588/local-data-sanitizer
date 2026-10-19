@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeFiles, sanitizeFiles, scanTexts, canonicalKey } from '../engine.js';
+import { amountChange } from '../jiggle.js';
 
 const ALL = { rules: { email: true, phone: true, ssn: true, creditCard: true }, customKeywords: ['Project Phoenix'] };
 const jsonFile = (obj, name = 'data.json') =>
@@ -91,6 +92,45 @@ describe('analyzeFiles + sanitizeFiles (JSON)', () => {
     expect(text).not.toContain('4111 1111 1111 1111');
     expect(text).not.toContain('ending in 1111');
     expect(text).toContain(`ending in ${fakeLast4}`);
+  });
+
+  it('jiggles repeated amounts once, within ±20%, keeping their format', async () => {
+    const file = jsonFile({
+      invoice: '$1,234.56',
+      summary: 'Total due $1,234.56',
+      fee: '$999.00',
+      zero: '$0.00',
+    });
+    const entries = await analyzeFiles([file], { rules: { amount: true }, customKeywords: [] });
+    const amounts = entries.filter((e) => e.type === 'amount');
+    expect(amounts).toHaveLength(2);
+
+    const invoice = amounts.find((e) => e.original === '$1,234.56');
+    expect(invoice.count).toBe(2);
+    expect(invoice.fakeValue).toMatch(/^\$[\d,]+\.\d{2}$/);
+    const change = amountChange(invoice.original, invoice.fakeValue);
+    expect(Math.abs(change)).toBeGreaterThan(0);
+    expect(Math.abs(change)).toBeLessThanOrEqual(20.01);
+
+    const [result] = await sanitizeFiles([file], entries);
+    const text = await result.blob.text();
+    expect(text).not.toContain('1,234.56');
+    expect(text.split(invoice.fakeValue).length - 1).toBe(2);
+    expect(text).toContain('$0.00');
+  });
+
+  it('jiggles numeric JSON leaves and keeps them numbers', async () => {
+    const file = jsonFile({ balance: 1234.56, note: 'balance 1234.56', count: 42 });
+    const entries = await analyzeFiles([file], { rules: { amount: true }, customKeywords: [] });
+    const amount = entries.find((e) => e.type === 'amount');
+    expect(amount.count).toBe(2);
+
+    const [result] = await sanitizeFiles([file], entries);
+    const out = JSON.parse(await result.blob.text());
+    expect(typeof out.balance).toBe('number');
+    expect(out.balance).toBe(Number(amount.fakeValue));
+    expect(out.note).toBe(`balance ${amount.fakeValue}`);
+    expect(out.count).toBe(42);
   });
 
   it('honours disabled entries during execution', async () => {

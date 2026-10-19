@@ -34,6 +34,16 @@ describe('text helpers', () => {
     expect(applyEntriesToText('John Smith', entries)).toBe('Ada Lovelace');
   });
 
+  it('never rescans a replacement, so a shorter entry cannot corrupt a longer fake', () => {
+    const entries = [
+      { type: 'amount', original: '$1,234.56', fakeValue: '$1,411.80', enabled: true },
+      { type: 'amount', original: '$1', fakeValue: '$0.95', enabled: true },
+    ];
+    expect(applyEntriesToText('total $1,234.56 and fee $1', entries)).toBe(
+      'total $1,411.80 and fee $0.95',
+    );
+  });
+
   it('names sanitized outputs', () => {
     expect(sanitizedName('report.docx', 'docx')).toBe('report.sanitized.docx');
     expect(sanitizedName('data.v2.csv', 'csv')).toBe('data.v2.sanitized.csv');

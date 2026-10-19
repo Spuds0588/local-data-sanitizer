@@ -72,6 +72,29 @@ describe('detectInText', () => {
     expect(detectInText('last four digits: 4242', cfg)[0].value).toBe('last four digits: 4242');
   });
 
+  it('flags monetary amounts and leaves dates, percents and IDs alone', () => {
+    const cfg = { rules: { amount: true }, customKeywords: [] };
+    const values = detectInText(
+      'Invoice $1,234.56 · retainer 5,000.00 · fee 1200.75 · budget USD 2,000',
+      cfg,
+    ).map((m) => m.value);
+    expect(values).toEqual(['$1,234.56', '5,000.00', '1200.75', 'USD 2,000']);
+
+    expect(detectInText('dated 2024.01.15', cfg)).toHaveLength(0);
+    expect(detectInText('rate 123.45%', cfg)).toHaveLength(0);
+    expect(detectInText('txn 4509123456789012', cfg)).toHaveLength(0);
+    expect(detectInText('zero $0.00', cfg)).toHaveLength(0);
+    // European grouping is out of scope — better to miss it than rewrite "€1"
+    // out of "€1.234,56" and leave the rest of the number behind.
+    expect(detectInText('total €1.234,56', cfg)).toHaveLength(0);
+  });
+
+  it('captures signed and accounting-style amounts whole', () => {
+    const cfg = { rules: { amount: true }, customKeywords: [] };
+    expect(detectInText('refund ($1,000.00)', cfg)[0].value).toBe('($1,000.00)');
+    expect(detectInText('charge -$1,000.00', cfg)[0].value).toBe('-$1,000.00');
+  });
+
   it('does not double-report a full card number as a fragment', () => {
     const found = detectInText('4111 1111 1111 1111', {
       rules: { creditCard: true, creditCardPartial: true },

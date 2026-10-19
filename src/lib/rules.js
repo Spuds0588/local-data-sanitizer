@@ -1,5 +1,9 @@
 // Standard regex detectors + custom keyword matching.
 
+import { parseAmount } from './jiggle.js';
+
+const CURRENCY_CODES = 'USD|EUR|GBP|JPY|CAD|AUD|CHF|INR|MXN|BRL';
+
 export function digitCount(value) {
   return (String(value).match(/\d/g) || []).length;
 }
@@ -67,11 +71,37 @@ export const RULE_DEFS = {
       /\blast\s+(?:four|4)\s+(?:digits|numbers?)(?:\s*(?:are|is|:|=|#|-))?\s*\d{4}(?!\d)/gi,
     ],
   },
+  amount: {
+    id: 'amount',
+    label: 'Monetary amounts (±20% jiggle)',
+    hint: '$1,234.56, USD 2,000, 5,000.00, 1200.75 — format kept',
+    priority: 5,
+    caseInsensitive: false,
+    patterns: [
+      // Symbol amounts: $1,234.56, -$1,200.00, ($1,234.56)
+      /(?<![\w$€£¥₹])[-+]?\(?\s?[$€£¥₹]\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?\)?(?!\d)(?!\.\d)(?!,\d)/g,
+      // Currency-code amounts: USD 1,234.56, eur 2,000
+      new RegExp(
+        `\\b(?:${CURRENCY_CODES})\\s?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d{1,2})?(?!\\d)(?!\\.\\d)(?!,\\d)(?!\\s*%)`,
+        'gi',
+      ),
+      // Bare grouped decimals: 1,234.56 (financial tables, exports)
+      /(?<![\w.,])\(?[-+]?\d{1,3}(?:,\d{3})+\.\d{2}(?!\d)(?!\s*%)/g,
+      // Bare decimals with 3+ integer digits: 1200.75. The digit floor keeps
+      // dates (2024.01.15) and version-like numbers (1.20) out of the results.
+      /(?<![\w.,])\(?[-+]?\d{3,}\.\d{2}(?!\d)(?!\.\d)(?!\s*%)/g,
+    ],
+    // Zero has no meaningful percentage to shift, and it leaks nothing.
+    validate: (value) => {
+      const parsed = parseAmount(value);
+      return Boolean(parsed) && parsed.value !== 0;
+    },
+  },
   phone: {
     id: 'phone',
     label: 'Phone numbers (US)',
     hint: '(555) 123-4567, 555-123-4567, +1 555 123 4567',
-    priority: 5,
+    priority: 6,
     caseInsensitive: false,
     // Deliberately stricter than a bare \d{10}: a separator (or parentheses)
     // must be present, so transaction/account numbers are not mistaken for
@@ -83,7 +113,7 @@ export const RULE_DEFS = {
 };
 
 export const DEFAULT_CONFIG = {
-  rules: { email: true, phone: true, ssn: true, creditCard: true, creditCardPartial: true },
+  rules: { email: true, phone: true, ssn: true, creditCard: true, creditCardPartial: true, amount: true },
   customKeywords: [],
 };
 

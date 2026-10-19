@@ -80,6 +80,8 @@ describe('RulesStep', () => {
     expect(html).toContain('Email addresses');
     expect(html).toContain('Credit card numbers');
     expect(html).toContain('Card fragments (masked / last four)');
+    expect(html).toContain('Monetary amounts (±20% jiggle)');
+    expect(html).toContain('only the number moves');
     expect(html).toContain('role="checkbox"');
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain('Custom keywords');
@@ -140,6 +142,28 @@ describe('ReviewStep', () => {
     expect(html).toContain('payroll.sanitized.xlsx');
     expect(html).toContain('(123 bytes)');
     expect(html).toContain('Downloaded 1 file');
+  });
+
+  it('shows how far a jiggled amount moved', () => {
+    const html = render(
+      <ReviewStep
+        {...props}
+        entries={[
+          {
+            id: 'a1',
+            type: 'amount',
+            original: '$1,000.00',
+            fakeValue: '$800.00',
+            count: 1,
+            context: 'total $1,000.00',
+            enabled: true,
+          },
+        ]}
+        enabledCount={1}
+      />,
+    );
+    expect(html).toContain('amount');
+    expect(html).toContain('-20.0%');
   });
 
   it('explains an empty result set', () => {

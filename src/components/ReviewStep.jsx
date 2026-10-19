@@ -1,4 +1,5 @@
 import { AlertIcon, CheckIcon, DownloadIcon } from './Icons.jsx';
+import { amountChange } from '../lib/jiggle.js';
 
 // Raw detector ids are terse; the badge shows what the user actually matched.
 const TYPE_LABEL = {
@@ -7,6 +8,7 @@ const TYPE_LABEL = {
   ssn: 'ssn',
   creditCard: 'card',
   creditCardPartial: 'card digits',
+  amount: 'amount',
   custom: 'keyword',
 };
 
@@ -64,7 +66,9 @@ export default function ReviewStep({ entries, enabledCount, status, downloads, o
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
+              {entries.map((entry) => {
+                const change = entry.type === 'amount' ? amountChange(entry.original, entry.fakeValue) : null;
+                return (
                 <tr key={entry.id} className="border-b border-neutral-800 align-top last:border-b-0">
                   <td className="px-3 py-2">
                     <input
@@ -92,11 +96,18 @@ export default function ReviewStep({ entries, enabledCount, status, downloads, o
                       onChange={(e) => onSetFake(entry.id, e.target.value)}
                       className="w-44 border border-neutral-600 px-2 py-1 font-mono text-[11px] outline-none focus:border-white focus:bg-white focus:text-black"
                     />
+                    {change !== null && (
+                      <p className="mt-1 font-mono text-[10px] text-neutral-400">
+                        {change > 0 ? '+' : ''}
+                        {change.toFixed(1)}%
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-2 font-mono text-neutral-400">{entry.count}</td>
                   <td className="max-w-xs px-3 py-2 font-mono text-[11px] text-neutral-400">{entry.context}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

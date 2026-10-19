@@ -55,6 +55,10 @@ export default function RulesStep({ config, updateConfig, addKeyword, removeKeyw
             </li>
           ))}
         </ul>
+        <p className="mt-2 text-[11px] text-neutral-400">
+          Amounts keep their currency, separators and decimals — only the number moves, by up to
+          ±20%.
+        </p>
       </section>
 
       <section>

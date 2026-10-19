@@ -90,6 +90,7 @@ export default function App() {
 
         <p className="mt-6 text-[11px] text-neutral-400">
           Nothing is uploaded. PDFs export as plain .txt; everything else keeps its format.
+          Amounts are jiggled by up to ±20%.
         </p>
 
         <ShareBar />

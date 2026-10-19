@@ -27,8 +27,13 @@ export function replaceAll(text, search, replacement, caseInsensitive = false) {
 
 /**
  * Apply the approved replacement dictionary entries to a single string.
- * `custom` and `email` matches are case-insensitive so "John Doe" and "john doe"
- * resolve to the same fake value (referential integrity).
+ * Matching is case-insensitive so "John Doe" and "john doe" resolve to the
+ * same fake value (referential integrity); digits are unaffected by casing.
+ *
+ * Everything runs in one pass with a single alternation. Doing it entry by
+ * entry would let a later, shorter original match inside an already-written
+ * fake value and corrupt it — e.g. a saved "$1" entry chewing into a jiggled
+ * "$1,411.80" produced from "$1,234.56".
  * @param {string} text
  * @param {Array<{type:string, original:string, fakeValue:string, enabled:boolean}>} entries
  * @param {{xmlSafe?: boolean}} opts
@@ -40,13 +45,20 @@ export function applyEntriesToText(text, entries, opts = {}) {
   const active = entries
     .filter((entry) => entry && entry.enabled !== false && entry.original)
     .sort((a, b) => b.original.length - a.original.length);
-  let out = text;
+  if (active.length === 0) return text;
+
+  const lookup = new Map();
   for (const entry of active) {
-    const ci = entry.type === 'custom' || entry.type === 'email';
-    const value = xmlSafe ? escapeXml(entry.fakeValue) : entry.fakeValue;
-    out = replaceAll(out, entry.original, value, ci);
+    const key = entry.original.toLowerCase();
+    if (!lookup.has(key)) lookup.set(key, entry);
   }
-  return out;
+
+  const re = new RegExp(active.map((entry) => escapeRegExp(entry.original)).join('|'), 'gi');
+  return text.replace(re, (match) => {
+    const entry = lookup.get(match.toLowerCase());
+    if (!entry) return match;
+    return xmlSafe ? escapeXml(entry.fakeValue) : entry.fakeValue;
+  });
 }
 
 /** "report.docx" -> "report.sanitized.docx" */

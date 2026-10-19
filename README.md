@@ -26,6 +26,10 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
 - **Rules engine:** toggle standard detectors (email, phone, SSN, Luhn-checked cards, and
   masked/last-four card fragments) and add your own secret keywords ("Project Phoenix",
   "Elon Musk", …).
+- **Value jiggler:** monetary amounts (`$1,234.56`, `USD 2,000`, `5,000.00`, `1200.75`,
+  including `-` and accounting `(…)` forms) are shifted by up to ±20% while keeping the
+  currency mark, thousands separators, decimals and sign. The document keeps its shape
+  without carrying the real figures, and numeric JSON leaves stay numbers.
 - **Name variants:** a multi-word keyword like `John Smith` also redacts bare `John`,
   `Smith` and `JohnSmith`, each mapped to the matching token of the same fake name.
 - **Few false positives:** phone matching requires real separators, so transaction and
@@ -74,3 +78,5 @@ npm run build    # static output in dist/
 - DOCX replacement edits `word/document.xml` text nodes; PII split across multiple Word
   runs may not be caught, and headers/footers are not scanned yet.
 - SheetJS export re-creates the workbook, so exotic cell styling is not preserved.
+- The jiggler reads US-style amounts only (`1,234.56`, not `1.234,56`), leaves bare integers
+  (counts, IDs, years) alone, and does not recompute totals or subtotals after a shift.

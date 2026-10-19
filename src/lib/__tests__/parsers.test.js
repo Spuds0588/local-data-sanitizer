@@ -26,6 +26,23 @@ describe('jsonParser', () => {
     expect(out['fake@x.com'].n).toBe(42);
   });
 
+  it('jiggles numeric leaves in place instead of stringifying them', async () => {
+    const file = new File(
+      [JSON.stringify({ balance: 1234.56, note: 'balance 1234.56', count: 42 })],
+      'money.json',
+      { type: 'application/json' },
+    );
+    const amountEntries = [
+      { id: 'a1', type: 'amount', original: '1234.56', fakeValue: '987.65', enabled: true },
+    ];
+    expect(await jsonParser.detect(file)).toEqual(expect.arrayContaining(['1234.56']));
+    const { blob } = await jsonParser.sanitize(file, amountEntries);
+    const out = JSON.parse(await blob.text());
+    expect(out.balance).toBe(987.65);
+    expect(out.note).toBe('balance 987.65');
+    expect(out.count).toBe(42);
+  });
+
   it('reports invalid JSON with the file name', async () => {
     const file = new File(['{ not json'], 'bad.json', { type: 'application/json' });
     await expect(jsonParser.detect(file)).rejects.toThrow(/Invalid JSON in "bad.json"/);
@@ -55,6 +72,24 @@ describe('xlsxParser (xlsx)', () => {
     const rows = XLSX.utils.sheet_to_json(out.Sheets.People, { header: 1 });
     expect(rows[1]).toEqual(['fake@x.com', 'Project Alpha']);
     expect(rows[2][0]).toBe('other@acme.com');
+  });
+
+  it('jiggles amount cells and keeps the sheet shape', async () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['total'], ['$1,234.56']]), 'Totals');
+    const file = new File([XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' })], 'totals.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const amountEntries = [
+      { id: 'a1', type: 'amount', original: '$1,234.56', fakeValue: '$1,411.80', enabled: true },
+    ];
+    expect(await xlsxParser.detect(file)).toContain('$1,234.56');
+    const { blob } = await xlsxParser.sanitize(file, amountEntries);
+    const out = XLSX.read(await blob.arrayBuffer(), { type: 'array' });
+    expect(XLSX.utils.sheet_to_json(out.Sheets.Totals, { header: 1 })).toEqual([
+      ['total'],
+      ['$1,411.80'],
+    ]);
   });
 
   it('exports CSV input back out as CSV', async () => {

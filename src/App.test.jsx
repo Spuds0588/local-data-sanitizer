@@ -9,6 +9,7 @@ describe('App shell', () => {
     expect(html).toContain('Scrub-Hub');
     expect(html).toContain('Runs entirely in this browser');
     expect(html).toContain('Nothing is uploaded');
+    expect(html).toContain('Amounts are jiggled by up to ±20%');
   });
 
   it('renders exactly the three wizard steps', () => {
