@@ -63,9 +63,10 @@ npm run build    # static output in dist/
   every push to `main` runs `.github/workflows/deploy.yml`, which builds with
   `VITE_BASE_PATH=/local-data-sanitizer/` and publishes `dist/`.
 
-  **One-time setup:** the repository must publish from Actions, not from a branch.
-  Set [Settings → Pages → Build and deployment → Source][pages-source] to
-  **GitHub Actions**. While it is still set to *Deploy from a branch*, GitHub
+  The workflow also pins Pages to *GitHub Actions* on every run, so the built
+  artifact is not overwritten by GitHub's branch build. If that API call ever
+  fails, set [Settings → Pages → Build and deployment → Source][pages-source] to
+  **GitHub Actions** by hand. While it is set to *Deploy from a branch*, GitHub
   rebuilds the repo root on every push and serves `index.html` verbatim, which
   points at the unbundled `/src/main.jsx` and renders a blank page.
 

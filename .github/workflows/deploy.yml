@@ -41,5 +41,14 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # If Pages is still set to "Deploy from a branch", GitHub rebuilds the
+      # repo root after this workflow finishes and serves index.html verbatim
+      # (which points at /src/main.jsx) - a blank page. Pinning the source to
+      # Actions keeps the published dist/ artifact live.
+      - name: Point Pages at GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow --jq '.build_type'
+
       - id: deployment
         uses: actions/deploy-pages@v4
