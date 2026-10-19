@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountChange, jiggleAmount, parseAmount } from '../jiggle.js';
+import { amountChange, jiggleAmount, jiggleNumber, parseAmount } from '../jiggle.js';
 
 const at = (random) => ({ random: () => random });
 
@@ -75,11 +75,36 @@ describe('jiggleAmount', () => {
   });
 });
 
+describe('jiggleNumber', () => {
+  it('keeps whole-dollar numbers whole and inside ±20%', () => {
+    expect(jiggleNumber(1000, at(0))).toBe(800);
+    expect(jiggleNumber(1000, at(1))).toBe(1200);
+    expect(jiggleNumber(-1450, at(0))).toBe(-1160);
+    expect(Number.isInteger(jiggleNumber(4250, at(0.5)))).toBe(true);
+  });
+
+  it('moves a number at the midpoint instead of returning it', () => {
+    expect(jiggleNumber(4250, at(0.5))).toBe(4251);
+    expect(jiggleNumber(-4250, at(0.5))).toBe(-4251);
+  });
+
+  it('keeps decimal precision and leaves zero alone', () => {
+    expect(jiggleNumber(1234.56, at(0))).toBe(987.65);
+    expect(jiggleNumber(0, at(0))).toBe(0);
+    expect(jiggleNumber(Number.NaN, at(0))).toBeNaN();
+  });
+});
+
 describe('amountChange', () => {
   it('reports the percentage shift', () => {
     expect(amountChange('$100.00', '$120.00')).toBeCloseTo(20);
     expect(amountChange('$100.00', '$80.00')).toBeCloseTo(-20);
     expect(amountChange('$0.00', '$10.00')).toBeNull();
     expect(amountChange('$100.00', 'nope')).toBeNull();
+  });
+
+  it('also measures bare numbers from numeric JSON leaves', () => {
+    expect(amountChange('4250', '5100')).toBeCloseTo(20);
+    expect(amountChange('4250', '3400')).toBeCloseTo(-20);
   });
 });

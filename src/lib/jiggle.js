@@ -97,14 +97,50 @@ export function jiggleAmount(text, opts = {}) {
 }
 
 /**
+ * Jiggle a raw JSON number. Integers stay integers so a schema that expects
+ * whole dollars is not turned into floats; decimals keep their precision.
+ * @param {number} value
+ * @param {{rate?: number, random?: () => number}} [opts]
+ */
+export function jiggleNumber(value, opts = {}) {
+  const { rate = JIGGLE_RATE, random = Math.random } = opts;
+  if (!Number.isFinite(value) || value === 0) return value;
+
+  const fraction = Number.isInteger(value) ? '' : String(Math.abs(value)).split('.')[1] || '';
+  const decimals = Math.min(6, fraction.length);
+
+  let next = null;
+  for (let i = 0; i < ATTEMPTS && next === null; i += 1) {
+    const factor = 1 - rate + random() * 2 * rate;
+    const candidate = round(value * factor, decimals);
+    if (candidate !== 0 && candidate !== value) next = candidate;
+  }
+  if (next === null) {
+    const step = 10 ** -decimals;
+    next = round(value + (value > 0 ? step : -step), decimals);
+  }
+  return next;
+}
+
+/** Accepts both formatted amounts and bare numbers (numeric JSON leaves). */
+function magnitude(text) {
+  const parsed = parseAmount(text);
+  if (parsed) return parsed.value;
+  const raw = String(text ?? '').trim();
+  if (!/^-?\d+(?:\.\d+)?$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
  * Percentage change between two amount strings, or null when either side is not
  * parseable. Used to show the reviewer how far a value moved.
  * @param {string} original
  * @param {string} fake
  */
 export function amountChange(original, fake) {
-  const from = parseAmount(original);
-  const to = parseAmount(fake);
-  if (!from || !to || from.value === 0) return null;
-  return ((to.value - from.value) / from.value) * 100;
+  const from = magnitude(original);
+  const to = magnitude(fake);
+  if (from === null || to === null || from === 0) return null;
+  return ((to - from) / from) * 100;
 }

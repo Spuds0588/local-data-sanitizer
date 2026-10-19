@@ -28,8 +28,9 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
   "Elon Musk", …).
 - **Value jiggler:** monetary amounts (`$1,234.56`, `USD 2,000`, `5,000.00`, `1200.75`,
   including `-` and accounting `(…)` forms) are shifted by up to ±20% while keeping the
-  currency mark, thousands separators, decimals and sign. The document keeps its shape
-  without carrying the real figures, and numeric JSON leaves stay numbers.
+  currency mark, thousands separators, decimals and sign. Numeric JSON leaves stay numbers,
+  and whole-dollar figures under a money-like key (`"balance": 4250`, `"amount": 3200`)
+  are shifted too, while counts, years and IDs are left alone.
 - **Name variants:** a multi-word keyword like `John Smith` also redacts bare `John`,
   `Smith` and `JohnSmith`, each mapped to the matching token of the same fake name.
 - **Few false positives:** phone matching requires real separators, so transaction and

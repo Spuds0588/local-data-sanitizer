@@ -43,6 +43,48 @@ describe('jsonParser', () => {
     expect(out.count).toBe(42);
   });
 
+  it('reports whole-dollar numbers under money keys, with their key', async () => {
+    const file = new File(
+      [JSON.stringify({ opening_balance: 4250, amount: 3200, count: 42, note: 'ID 4250' })],
+      'statement.json',
+      { type: 'application/json' },
+    );
+    const { segments, moneyNumbers } = await jsonParser.detectWithMeta(file);
+    expect(segments).toEqual(expect.arrayContaining(['4250', '3200', '42']));
+    expect(moneyNumbers).toEqual(
+      expect.arrayContaining([
+        { original: '4250', key: 'opening_balance', numeric: true },
+        { original: '3200', key: 'amount', numeric: true },
+      ]),
+    );
+    expect(moneyNumbers).toHaveLength(2);
+
+    const amountEntries = [
+      { id: 'a1', type: 'amount', original: '4250', fakeValue: '3712', enabled: true, numericOnly: true },
+      { id: 'a2', type: 'amount', original: '3200', fakeValue: '2810', enabled: true, numericOnly: true },
+    ];
+    const { blob } = await jsonParser.sanitize(file, amountEntries);
+    const out = JSON.parse(await blob.text());
+    expect(out.opening_balance).toBe(3712);
+    expect(out.amount).toBe(2810);
+    expect(out.count).toBe(42);
+    // Numeric-only entries must not rewrite the same digits inside strings.
+    expect(out.note).toBe('ID 4250');
+  });
+
+  it('jiggles bare-number strings under a money key as strings', async () => {
+    const file = new File([JSON.stringify({ balance: '4250' })], 'strings.json', {
+      type: 'application/json',
+    });
+    const { moneyNumbers } = await jsonParser.detectWithMeta(file);
+    expect(moneyNumbers).toEqual([{ original: '4250', key: 'balance', numeric: false }]);
+    const entries = [
+      { id: 'a1', type: 'amount', original: '4250', fakeValue: '3712', enabled: true },
+    ];
+    const { blob } = await jsonParser.sanitize(file, entries);
+    expect(JSON.parse(await blob.text()).balance).toBe('3712');
+  });
+
   it('reports invalid JSON with the file name', async () => {
     const file = new File(['{ not json'], 'bad.json', { type: 'application/json' });
     await expect(jsonParser.detect(file)).rejects.toThrow(/Invalid JSON in "bad.json"/);

@@ -132,6 +132,41 @@ export function scanTexts(texts, config) {
 }
 
 /**
+ * Whole-dollar figures under a money key ("balance": 4250) have no currency
+ * mark or decimal for the text detectors to key on. Parsers that know the key
+ * report them separately; merge them into the same dictionary.
+ */
+function addMoneyNumbers(found, moneyNumbers) {
+  const byOriginal = new Map(found.filter((e) => e.type === 'amount').map((e) => [e.original, e]));
+  const fromNumbers = new Set();
+  for (const item of moneyNumbers) {
+    const original = String(item.original);
+    if (!original) continue;
+    const existing = byOriginal.get(original);
+    if (existing) {
+      // A formatted amount (1234.56) was already counted by the text scan; a
+      // repeated bare number (two 4250 balances) was not.
+      if (fromNumbers.has(original)) existing.count += 1;
+      // A string occurrence can be replaced anywhere; a numeric one cannot.
+      if (!item.numeric) delete existing.numericOnly;
+      continue;
+    }
+    fromNumbers.add(original);
+    const entry = {
+      id: `amount:${original}`,
+      key: original,
+      type: 'amount',
+      original,
+      count: 1,
+      context: `${item.key}: ${original}`,
+    };
+    if (item.numeric) entry.numericOnly = true;
+    byOriginal.set(original, entry);
+    found.push(entry);
+  }
+}
+
+/**
  * Scan every file and build the review entries (original -> proposed fake).
  * @param {File[]} files
  * @param {import('./rules.js').DEFAULT_CONFIG} config
@@ -139,14 +174,22 @@ export function scanTexts(texts, config) {
  */
 export async function analyzeFiles(files, config, log = () => {}) {
   const texts = [];
+  const moneyNumbers = [];
   for (const file of files) {
     const parser = getParser(file);
-    const segments = await parser.detect(file, config, log);
+    const detected = parser.detectWithMeta
+      ? await parser.detectWithMeta(file, config, log)
+      : { segments: await parser.detect(file, config, log) };
+    const segments = Array.isArray(detected) ? detected : detected.segments || [];
     log(`Scanned "${file.name}" (${segments.length} text segment(s)).`);
     texts.push(...segments);
+    if (!Array.isArray(detected) && Array.isArray(detected.moneyNumbers)) {
+      moneyNumbers.push(...detected.moneyNumbers);
+    }
   }
 
   const found = scanTexts(texts, config);
+  addMoneyNumbers(found, moneyNumbers);
   const used = new Set();
   let entries = found.map((f) => ({
     ...f,

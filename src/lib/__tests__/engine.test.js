@@ -133,6 +133,38 @@ describe('analyzeFiles + sanitizeFiles (JSON)', () => {
     expect(out.count).toBe(42);
   });
 
+  it('jiggles whole-dollar numeric leaves picked up from money keys', async () => {
+    const file = jsonFile({
+      opening_balance: 4250,
+      closing_balance: 4250,
+      amount: 3200,
+      count: 7,
+      year: 2026,
+      note: 'reference 4250',
+    });
+    const entries = await analyzeFiles([file], { rules: { amount: true }, customKeywords: [] });
+    const amounts = entries.filter((e) => e.type === 'amount');
+    expect(amounts.map((e) => e.original).sort()).toEqual(['3200', '4250']);
+
+    const balance = amounts.find((e) => e.original === '4250');
+    const amount = amounts.find((e) => e.original === '3200');
+    expect(balance.count).toBe(2);
+    expect(balance.numericOnly).toBe(true);
+    expect(Number(balance.fakeValue)).not.toBe(4250);
+    expect(Math.abs(amountChange(balance.original, balance.fakeValue))).toBeLessThanOrEqual(20.01);
+
+    const [result] = await sanitizeFiles([file], entries);
+    const out = JSON.parse(await result.blob.text());
+    // Schema survives: the leaves stay numbers, the count and year stay put.
+    expect(out.opening_balance).toBe(Number(balance.fakeValue));
+    expect(out.closing_balance).toBe(Number(balance.fakeValue));
+    expect(out.amount).toBe(Number(amount.fakeValue));
+    expect(out.count).toBe(7);
+    expect(out.year).toBe(2026);
+    // A bare-number entry derived from a number must not touch strings.
+    expect(out.note).toBe('reference 4250');
+  });
+
   it('honours disabled entries during execution', async () => {
     const file = jsonFile({ email: 'keep.me@acme.com' });
     const entries = (await analyzeFiles([file], ALL)).map((e) => ({ ...e, enabled: false }));
