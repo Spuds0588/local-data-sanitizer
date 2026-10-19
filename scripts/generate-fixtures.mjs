@@ -232,7 +232,15 @@ addFile('user-export.json', jsonSecrets);
 function escapeXml(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-const paragraph = (value) => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p>`;
+// A real Word paragraph is not one run: spell-check and formatting split names,
+// emails and IDs into several `<w:t>` nodes. Accepting an array here exercises
+// the cross-run path in the corpus instead of only in unit tests.
+const paragraph = (value) =>
+  `<w:p>${
+    (Array.isArray(value) ? value : [value])
+      .map((run) => `<w:r><w:t xml:space="preserve">${escapeXml(run)}</w:t></w:r>`)
+      .join('')
+  }</w:p>`;
 const table = (rows) =>
   `<w:tbl>${rows
     .map((row) => `<w:tr>${row.map((cell) => `<w:tc>${paragraph(cell)}</w:tc>`).join('')}</w:tr>`)
@@ -240,12 +248,12 @@ const table = (rows) =>
 
 const kycParagraphs = [
   'Customer Profile — Confidential',
-  'Full name: Marcus Webb',
+  ['Full name: Marcus ', 'Webb'],
   'Date of birth: 04/17/1986',
   'SSN: 573-91-2244',
   'Passport No: 512345678',
   "Driver's License: WDL-8842193",
-  'Email: marcus.webb@example.com',
+  ['Email: marcus.webb@', 'example.com'],
   'Phone: +1 (415) 555-0138',
   'Residential address: 742 Evergreen Terrace, Springfield, IL 62704',
   'Employer: Northwind Traders',
@@ -254,14 +262,14 @@ const kycParagraphs = [
   'Routing Number: 021000021',
   'IBAN: GB82WEST12345698765432',
   'IP address: 203.0.113.42',
-  'Spouse: Jane Doe',
+  ['Spouse: Jane ', 'Doe'],
   'Spouse first name only: Jane',
   'Primary card on file: **** **** **** 1111',
   'Notes: prefers contact by email. Verify identity before any wire transfer.',
 ];
 const kycTable = [
   ['Beneficiary', 'Email', 'Phone', 'Share'],
-  ['Jane Doe', 'jane.doe@example.com', '(206) 555-0177', '50%'],
+  [['Jane', ' Doe'], ['jane.doe@', 'example.com'], '(206) 555-0177', '50%'],
   ['Robert Chen', 'robert.chen@example.com', '(415) 555-0193', '50%'],
 ];
 
@@ -312,21 +320,25 @@ addFile('kyc-profile.docx', [
 // The title placeholder names the candidate; the body carries the deck topic.
 // That is the deck equivalent of a resume Title line, and it is what lets the
 // same name be scrubbed in the speaker notes below.
-const deckTitle = 'Priya Natarajan';
 const deckSubtitle = 'Q1 hiring review — confidential';
 const deckRows = [
   ['Full Name', 'Email', 'Phone', 'Department'],
-  ['Diego Marques', 'diego.marques@contoso.example', '+1 (415) 555-0142', 'Finance'],
+  [['Diego ', 'Marques'], ['diego.marques@', 'contoso.example'], '+1 (415) 555-0142', 'Finance'],
   ['Amara Okafor', 'amara.okafor@contoso.example', '+44 20 7946 0123', 'Engineering'],
 ];
-const deckNotes = 'Follow up with Priya Natarajan on (415) 555-0199 before Friday.';
+// PowerPoint splits a name across runs when it was formatted or spell-checked.
+const deckNotes = ['Follow up with Priya ', 'Natarajan on (415) 555-0199 before Friday.'];
 
 function pptxBuffer() {
   const zip = new JSZip();
   const escapeXml = (value) =>
     String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const cell = (value) =>
-    `<a:tc><a:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(value)}</a:t></a:r></a:p></a:txBody></a:tc>`;
+    `<a:tc><a:txBody><a:bodyPr/><a:p>${
+      (Array.isArray(value) ? value : [value])
+        .map((run) => `<a:r><a:t xml:space="preserve">${escapeXml(run)}</a:t></a:r>`)
+        .join('')
+    }</a:p></a:txBody></a:tc>`;
   const row = (cells) => `<a:tr h="370840">${cells.map(cell).join('')}</a:tr>`;
   zip.file(
     '[Content_Types].xml',
@@ -365,7 +377,8 @@ function pptxBuffer() {
       '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
       '<p:cSld><p:spTree>' +
       '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>' +
-      `<p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(deckTitle)}</a:t></a:r></a:p></p:txBody></p:sp>` +
+      '<p:txBody><a:bodyPr/><a:p><a:r><a:t>Priya</a:t></a:r>' +
+      '<a:r><a:t xml:space="preserve"> Natarajan</a:t></a:r></a:p></p:txBody></p:sp>' +
       '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Subtitle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
       `<p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(deckSubtitle)}</a:t></a:r></a:p></p:txBody></p:sp>` +
       '<p:graphicFrame><a:graphic><a:graphicData><a:tbl>' +
@@ -377,7 +390,9 @@ function pptxBuffer() {
     'ppt/notesSlides/notesSlide1.xml',
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
-      `<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>${escapeXml(deckNotes)}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>`,
+      `<p:cSld><p:spTree><p:sp><p:txBody><a:p>${deckNotes
+        .map((run) => `<a:r><a:t xml:space="preserve">${escapeXml(run)}</a:t></a:r>`)
+        .join('')}</a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>`,
   );
   return zip.generateAsync({ type: 'nodebuffer', date: new Date('2024-01-01T00:00:00Z') });
 }

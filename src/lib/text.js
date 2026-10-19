@@ -26,26 +26,19 @@ export function replaceAll(text, search, replacement, caseInsensitive = false) {
 }
 
 /**
- * Apply the approved replacement dictionary entries to a single string.
- * Matching is case-insensitive so "John Doe" and "john doe" resolve to the
- * same fake value (referential integrity); digits are unaffected by casing.
- *
- * Everything runs in one pass with a single alternation. Doing it entry by
- * entry would let a later, shorter original match inside an already-written
- * fake value and corrupt it — e.g. a saved "$1" entry chewing into a jiggled
- * "$1,411.80" produced from "$1,234.56".
- * @param {string} text
+ * One alternation for the whole dictionary, shared by the plain-text replacer
+ * and the OOXML cross-run replacer so both agree on what a match is.
+ * Longest originals first, so "John Smith" is replaced as a unit before the
+ * derived "John"/"Smith" sub-strings get a chance to break it apart.
  * @param {Array<{type:string, original:string, fakeValue:string, enabled:boolean}>} entries
- * @param {{xmlSafe?: boolean, sqlSafe?: boolean}} opts
+ * @param {{sqlSafe?: boolean}} opts
  */
-export function applyEntriesToText(text, entries, opts = {}) {
-  const { xmlSafe = false, sqlSafe = false } = opts;
-  // Longest originals first, so "John Smith" is replaced as a unit before the
-  // derived "John"/"Smith" sub-strings get a chance to break it apart.
+export function entryMatcher(entries, opts = {}) {
+  const { sqlSafe = false } = opts;
   const active = entries
     .filter((entry) => entry && entry.enabled !== false && entry.original)
     .sort((a, b) => b.original.length - a.original.length);
-  if (active.length === 0) return text;
+  if (active.length === 0) return null;
 
   const lookup = new Map();
   for (const entry of active) {
@@ -67,8 +60,30 @@ export function applyEntriesToText(text, entries, opts = {}) {
       .join('|'),
     'gi',
   );
-  return text.replace(re, (match) => {
-    const entry = lookup.get(match.replace(/''/g, "'").toLowerCase()) || lookup.get(match.toLowerCase());
+  const resolve = (match) =>
+    lookup.get(match.replace(/''/g, "'").toLowerCase()) || lookup.get(match.toLowerCase());
+  return { re, resolve };
+}
+
+/**
+ * Apply the approved replacement dictionary entries to a single string.
+ * Matching is case-insensitive so "John Doe" and "john doe" resolve to the
+ * same fake value (referential integrity); digits are unaffected by casing.
+ *
+ * Everything runs in one pass with a single alternation. Doing it entry by
+ * entry would let a later, shorter original match inside an already-written
+ * fake value and corrupt it — e.g. a saved "$1" entry chewing into a jiggled
+ * "$1,411.80" produced from "$1,234.56".
+ * @param {string} text
+ * @param {Array<{type:string, original:string, fakeValue:string, enabled:boolean}>} entries
+ * @param {{xmlSafe?: boolean, sqlSafe?: boolean}} opts
+ */
+export function applyEntriesToText(text, entries, opts = {}) {
+  const { xmlSafe = false, sqlSafe = false } = opts;
+  const matcher = entryMatcher(entries, opts);
+  if (!matcher) return text;
+  return text.replace(matcher.re, (match) => {
+    const entry = matcher.resolve(match);
     if (!entry) return match;
     if (xmlSafe) return escapeXml(entry.fakeValue);
     return sqlSafe ? String(entry.fakeValue).replace(/'/g, "''") : entry.fakeValue;

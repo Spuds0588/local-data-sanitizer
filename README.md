@@ -52,6 +52,11 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
   field name. Values split over an iCalendar/vCard fold are rejoined, replaced and folded back
   to 75 characters, so the calendar still parses and nothing is reflowed. SQL literals keep
   their quoting and `''` escaping; XML fakes are entity-escaped so the document stays valid.
+- **Word and PowerPoint runs:** a paragraph is read as one string and written back through the
+  same runs, so a name, email or account number Word split across several `<w:t>`/`<a:t>`
+  nodes is still detected and replaced as one value. The fake is split on the original word
+  boundaries, so bold or italic stays on the same words; tracked deletions (`w:delText`) are
+  scrubbed too, even though they no longer show on screen.
 - **People vs companies:** a `Payee`/`Customer` column is typed as a person or an
   organisation from the value itself (`Whole Foods Market`, `City Power & Light`, `… LLC`),
   so exports keep reading as invoices instead of a list of people. Column headers are never
@@ -163,8 +168,9 @@ manifest in sync; replacements themselves are random per run.
   there is no general named-entity model. Add it as a custom keyword when it must be caught
   on its own.
 - PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
-- DOCX replacement edits `word/document.xml`, header, footer, note and comment text nodes;
-  PII split across multiple Word runs may not be caught.
+- DOCX/PPTX replacement covers paragraphs, headers, footers, notes and comments, including
+  values split across runs; embedded objects (charts, SmartArt, OLE) and images are not read,
+  and a text box nested inside another paragraph is handled a paragraph fragment at a time.
 - `.eml` bodies are decoded (quoted-printable, base64, RFC 2047 words), scrubbed and
   re-encoded in the same encoding, but attachments are left untouched: PII inside an attached
   PDF or spreadsheet is not reached unless that attachment is uploaded separately.

@@ -1,28 +1,24 @@
-// DOCX: unzip -> read paragraphs and tables -> edit word/document.xml text nodes -> re-zip.
+// DOCX: unzip -> read paragraphs and tables -> edit word/document.xml runs -> re-zip.
+//
+// Text is rewritten per paragraph rather than per run, so a name or email that
+// Word split across several `<w:t>` nodes is still one value (see runs.js).
 
 import JSZip from 'jszip';
-import { applyEntriesToText, sanitizedName } from '../text.js';
+import { sanitizedName } from '../text.js';
 import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
+import {
+  DOCX_PARAGRAPH,
+  DOCX_RUN,
+  mergedText,
+  paragraphText,
+  paragraphTexts,
+  replaceInParagraphs,
+} from './runs.js';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 async function loadZip(file) {
   return JSZip.loadAsync(await file.arrayBuffer());
-}
-
-/** Only the text between ">" and "<" is real document content, never XML tags. */
-function replaceTextNodes(xml, entries) {
-  return xml.replace(/>([^<]*)</g, (_full, text) => `>${applyEntriesToText(text, entries, { xmlSafe: true })}<`);
-}
-
-function textNodes(xml) {
-  const out = [];
-  const re = />([^<]*)</g;
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    if (m[1] && m[1].trim()) out.push(m[1]);
-  }
-  return out;
 }
 
 async function documentXml(zip, file) {
@@ -56,12 +52,12 @@ const TITLE_STOPWORDS = new Set([
  * it types the value without scanning every heading in the document.
  */
 function titleName(xml, typedValues) {
-  const re = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
+  const re = new RegExp(DOCX_PARAGRAPH.source, 'g');
   let match;
   while ((match = re.exec(xml)) !== null) {
     const style = /<w:pStyle\s+w:val="([^"]+)"/.exec(match[1]);
     if (!style || !/^title$/i.test(style[1])) continue;
-    const text = textNodes(match[1]).join(' ').replace(/\s+/g, ' ').trim();
+    const text = paragraphText(match[1], DOCX_RUN);
     if (!text || TITLE_STOPWORDS.has(text.toLowerCase())) continue;
     if (!looksLikeName(text)) continue;
     const item = extractTypedValue('name', text);
@@ -87,7 +83,7 @@ export function documentTables(xml) {
       const cellRe = /<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g;
       let cellMatch;
       while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-        cells.push(textNodes(cellMatch[1]).join(' ').replace(/\s+/g, ' ').trim());
+        cells.push(mergedText(cellMatch[1], DOCX_PARAGRAPH, DOCX_RUN));
       }
       if (cells.length) rows.push(cells);
     }
@@ -100,7 +96,9 @@ export async function detectWithMeta(file) {
   const zip = await loadZip(file);
   const xml = await documentXml(zip, file);
   const parts = await textParts(zip);
-  const segments = parts.flatMap((part) => textNodes(part.xml));
+  // Paragraphs, not runs: a value broken over two runs must reach the detector
+  // whole, or only one half of it is recognized and the other half survives.
+  const segments = parts.flatMap((part) => paragraphTexts(part.xml, DOCX_PARAGRAPH, DOCX_RUN));
   const typedValues = [];
   const moneyNumbers = [];
   titleName(xml, typedValues);
@@ -121,7 +119,7 @@ export async function detectWithMeta(file) {
 
   console.log(
     `[DOCX Parser] ${file.name}: document.xml is ${xml.length} chars, ` +
-      `${segments.length} text node(s), ${typedValues.length} typed table cell(s).`,
+      `${segments.length} paragraph(s), ${typedValues.length} typed table cell(s).`,
   );
   return { segments, typedValues, moneyNumbers };
 }
@@ -137,7 +135,12 @@ export async function sanitize(file, entries) {
   let before = 0;
   let after = 0;
   for (const part of parts) {
-    const updated = replaceTextNodes(part.xml, entries);
+    const updated = replaceInParagraphs(part.xml, {
+      paragraphRe: DOCX_PARAGRAPH,
+      runRe: DOCX_RUN,
+      entries,
+      keepSpace: true,
+    });
     before += part.xml.length;
     after += updated.length;
     zip.file(part.name, updated);

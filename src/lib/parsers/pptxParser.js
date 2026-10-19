@@ -1,12 +1,20 @@
 // PPTX: unzip -> read slide/notes text and tables -> edit the text runs -> re-zip.
 //
 // A deck is a zip of XML parts exactly like DOCX; only the element names differ
-// (`a:t` text runs, `a:tbl` tables). Replacement is still node-by-node literal
-// substitution, so layouts, themes, images, charts and speaker notes stay put.
+// (`a:t` text runs, `a:tbl` tables). Replacement is per paragraph, so a name
+// broken over two runs is caught whole (see runs.js); layouts, themes, images,
+// charts and speaker notes stay put.
 
 import JSZip from 'jszip';
-import { applyEntriesToText, sanitizedName } from '../text.js';
+import { sanitizedName } from '../text.js';
 import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
+import {
+  PPTX_PARAGRAPH,
+  PPTX_RUN,
+  mergedText,
+  paragraphTexts,
+  replaceInParagraphs,
+} from './runs.js';
 
 const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
@@ -14,23 +22,6 @@ const PART_RE = /^ppt\/(?:slides\/slide|notesSlides\/notesSlide|slideLayouts\/sl
 
 async function loadZip(file) {
   return JSZip.loadAsync(await file.arrayBuffer());
-}
-
-function textRuns(xml) {
-  const out = [];
-  const re = /<a:t>([^<]*)<\/a:t>/g;
-  let match;
-  while ((match = re.exec(xml)) !== null) {
-    if (match[1] && match[1].trim()) out.push(match[1]);
-  }
-  return out;
-}
-
-/** Replace only text-run content, leaving tags, attributes and metadata alone. */
-function replaceTextRuns(xml, entries) {
-  return xml.replace(/(<a:t>)([^<]*)(<\/a:t>)/g, (_full, open, text, close) =>
-    `${open}${text ? applyEntriesToText(text, entries, { xmlSafe: true }) : text}${close}`,
-  );
 }
 
 async function textParts(zip) {
@@ -54,7 +45,7 @@ export function slideTables(xml) {
       const cellRe = /<a:tc\b[^>]*>([\s\S]*?)<\/a:tc>/g;
       let cellMatch;
       while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-        cells.push(textRuns(cellMatch[1]).join(' ').replace(/\s+/g, ' ').trim());
+        cells.push(mergedText(cellMatch[1], PPTX_PARAGRAPH, PPTX_RUN));
       }
       if (cells.length) rows.push(cells);
     }
@@ -69,7 +60,7 @@ function titleNames(xml, typedValues) {
   let shape;
   while ((shape = shapes.exec(xml)) !== null) {
     if (!/<p:ph[^>]*type="(?:title|ctrTitle)"/.test(shape[1])) continue;
-    const text = textRuns(shape[1]).join(' ').replace(/\s+/g, ' ').trim();
+    const text = mergedText(shape[1], PPTX_PARAGRAPH, PPTX_RUN);
     if (!text || text.length > 60 || !looksLikeName(text)) continue;
     const item = extractTypedValue('name', text);
     if (item) typedValues.push({ original: item.original, type: item.type, key: 'Title', numeric: false });
@@ -81,7 +72,8 @@ export async function detectWithMeta(file) {
   const parts = await textParts(zip);
   if (parts.length === 0) throw new Error(`Not a valid .pptx: no slides found in "${file.name}".`);
 
-  const segments = parts.flatMap((part) => textRuns(part.xml));
+  // Paragraphs, not runs: split runs must reach the detector as one value.
+  const segments = parts.flatMap((part) => paragraphTexts(part.xml, PPTX_PARAGRAPH, PPTX_RUN));
   const typedValues = [];
   const moneyNumbers = [];
   for (const part of parts) {
@@ -120,7 +112,11 @@ export async function sanitize(file, entries) {
   let before = 0;
   let after = 0;
   for (const part of parts) {
-    const updated = replaceTextRuns(part.xml, entries);
+    const updated = replaceInParagraphs(part.xml, {
+      paragraphRe: PPTX_PARAGRAPH,
+      runRe: PPTX_RUN,
+      entries,
+    });
     before += part.xml.length;
     after += updated.length;
     zip.file(part.name, updated);

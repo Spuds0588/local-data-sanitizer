@@ -24,12 +24,15 @@ let manifest;
 let entries;
 const outputs = new Map();
 
-function textNodes(xml) {
+/**
+ * Text as a reader sees it: runs inside a paragraph are joined, so a name or
+ * email split over several runs is still one string for the leak check.
+ */
+function paragraphText(xml, paragraphRe, runRe) {
   const out = [];
-  const re = />([^<]*)</g;
-  let match;
-  while ((match = re.exec(xml)) !== null) {
-    if (match[1] && match[1].trim()) out.push(match[1]);
+  for (const paragraph of xml.matchAll(paragraphRe)) {
+    const text = [...paragraph[1].matchAll(runRe)].map((run) => run[1]).join('');
+    if (text.trim()) out.push(text.trim());
   }
   return out;
 }
@@ -78,7 +81,7 @@ async function extract(result) {
     const texts = [];
     for (const part of parts) {
       const xml = await zip.file(part).async('string');
-      for (const match of xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)) texts.push(match[1]);
+      texts.push(...paragraphText(xml, /<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g, /<a:t\b[^>]*>([^<]*)<\/a:t>/g));
     }
     return { name, kind: 'pptx', text: texts.join('\n'), parts: parts.length };
   }
@@ -87,7 +90,8 @@ async function extract(result) {
     const entry = zip.file('word/document.xml');
     expect(entry, `${name} must still be a valid docx`).toBeTruthy();
     const xml = await entry.async('string');
-    return { name, kind: 'docx', text: textNodes(xml).join('\n'), xml };
+    const text = paragraphText(xml, /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, /<w:t\b[^>]*>([^<]*)<\/w:t>/g);
+    return { name, kind: 'docx', text: text.join('\n'), xml };
   }
   return { name, kind: 'text', text: await blob.text() };
 }

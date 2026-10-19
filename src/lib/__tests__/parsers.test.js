@@ -156,7 +156,7 @@ describe('docxParser', () => {
     zip.file(
       'word/document.xml',
       '<?xml version="1.0"?><w:document><w:body><w:p><w:r><w:t>Email john@acme.com now</w:t></w:r>' +
-        '<w:r><w:t>Project Phoenix</w:t></w:r></w:p></w:body></w:document>',
+        '<w:r><w:t xml:space="preserve"> Project Phoenix</w:t></w:r></w:p></w:body></w:document>',
     );
     const buf = await zip.generateAsync({ type: 'nodebuffer' });
     return new File([buf], 'doc.docx', {
@@ -179,6 +179,129 @@ describe('docxParser', () => {
     expect(xml).toContain('Project Alpha');
     expect(xml).not.toContain('john@acme.com');
     expect(xml).toContain('<w:t>');
+  });
+});
+
+describe('cross-run text in OOXML', () => {
+  const stripTags = (xml) => xml.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&');
+
+  async function splitDocx() {
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      '<?xml version="1.0"?><w:document><w:body>' +
+        // A bold first name and a regular surname: Word splits names this way
+        // whenever part of the name was formatted separately.
+        '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Jane</w:t></w:r>' +
+        '<w:r><w:t xml:space="preserve"> Doe</w:t></w:r>' +
+        '<w:r><w:t xml:space="preserve"> — </w:t></w:r>' +
+        '<w:r><w:t>jane.d</w:t></w:r><w:r><w:t>oe@acme.example</w:t></w:r></w:p>' +
+        '<w:p><w:t>Untouched tail</w:t></w:p>' +
+        '</w:body></w:document>',
+    );
+    return new File([await zip.generateAsync({ type: 'nodebuffer' })], 'split.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+  }
+
+  it('reads a DOCX paragraph as one value even when it spans runs', async () => {
+    const { segments } = await docxParser.detectWithMeta(await splitDocx());
+    expect(segments).toContain('Jane Doe — jane.doe@acme.example');
+  });
+
+  it('replaces across DOCX runs without dropping formatting or changing the paragraph shape', async () => {
+    const file = await splitDocx();
+    const { blob } = await docxParser.sanitize(file, [
+      { type: 'name', original: 'Jane Doe', fakeValue: 'Maria Gonzalez', enabled: true },
+      { type: 'email', original: 'jane.doe@acme.example', fakeValue: 'maria.gonzalez@example.test', enabled: true },
+    ]);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml').async('string');
+    const text = stripTags(xml);
+    expect(text).not.toMatch(/Jane|Doe|jane\.d|acme\.example/);
+    expect(text).toContain('Maria Gonzalez — maria.gonzalez@example.test');
+    // Bold stays on the first name only, and the run is still a run.
+    expect(xml).toContain('<w:rPr><w:b/></w:rPr><w:t>Maria</w:t>');
+    expect(xml).toContain('<w:t xml:space="preserve"> Gonzalez</w:t>');
+    expect(xml.match(/<w:p>/g)).toHaveLength(2);
+    expect(xml).toContain('<w:p><w:t>Untouched tail</w:t></w:p>');
+  });
+
+  it('scrubs split table cells end-to-end, not just the half a per-run scan sees', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      '<w:document><w:body><w:tbl><w:tr>' +
+        '<w:tc><w:p><w:t>Full Name</w:t></w:p></w:tc><w:tc><w:p><w:t>Email</w:t></w:p></w:tc></w:tr><w:tr>' +
+        '<w:tc><w:p><w:t>Priya</w:t><w:t xml:space="preserve"> Natarajan</w:t></w:p></w:tc>' +
+        '<w:tc><w:p><w:t>priya.nata</w:t><w:t>rajan@acme.example</w:t></w:p></w:tc>' +
+        '</w:tr></w:tbl></w:body></w:document>',
+    );
+    const file = new File([await zip.generateAsync({ type: 'nodebuffer' })], 'split-table.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    const found = await analyzeFiles([file], DEFAULT_CONFIG);
+    expect(found).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'name', original: 'Priya Natarajan' }),
+        expect.objectContaining({ type: 'email', original: 'priya.natarajan@acme.example' }),
+      ]),
+    );
+    const [{ blob }] = await sanitizeFiles([file], found);
+    const out = await JSZip.loadAsync(await blob.arrayBuffer());
+    const text = stripTags(await out.file('word/document.xml').async('string'));
+    expect(text).not.toMatch(/Priya|Natarajan|priya\.nata|rajan@acme\.example/);
+    expect(text).toContain('Full Name');
+  });
+
+  it('scrubs tracked deletions that are still stored in the file', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      '<w:document><w:body><w:p><w:r><w:t xml:space="preserve">Signed by </w:t></w:r>' +
+        '<w:del w:id="1" w:author="legal"><w:r><w:delText>Jane Doe</w:delText></w:r></w:del></w:p>' +
+        '</w:body></w:document>',
+    );
+    const file = new File([await zip.generateAsync({ type: 'nodebuffer' })], 'tracked.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    expect(await docxParser.detect(file)).toContain('Signed by Jane Doe');
+    const { blob } = await docxParser.sanitize(file, [
+      { type: 'name', original: 'Jane Doe', fakeValue: 'Maria Gonzalez', enabled: true },
+    ]);
+    const out = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await out.file('word/document.xml').async('string');
+    expect(xml).toContain('<w:del w:id="1" w:author="legal"><w:r><w:delText>Maria Gonzalez</w:delText>');
+    expect(stripTags(xml)).not.toMatch(/Jane|Doe/);
+  });
+
+  it('replaces a PPTX title split across runs and keeps the placeholder', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'ppt/slides/slide1.xml',
+      '<?xml version="1.0"?><p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree>' +
+        '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>' +
+        '<p:txBody><a:p><a:r><a:rPr b="1"/><a:t>Priya</a:t></a:r>' +
+        '<a:r><a:t xml:space="preserve"> Natarajan</a:t></a:r></a:p></p:txBody></p:sp>' +
+        '</p:spTree></p:cSld></p:sld>',
+    );
+    const file = new File([await zip.generateAsync({ type: 'nodebuffer' })], 'split.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+    const { typedValues } = await pptxParser.detectWithMeta(file);
+    expect(typedValues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'name', original: 'Priya Natarajan' })]),
+    );
+
+    const { blob } = await pptxParser.sanitize(file, [
+      { type: 'name', original: 'Priya Natarajan', fakeValue: 'Nora Quinn', enabled: true },
+    ]);
+    const out = await JSZip.loadAsync(await blob.arrayBuffer());
+    const slide = await out.file('ppt/slides/slide1.xml').async('string');
+    expect(stripTags(slide)).toContain('Nora Quinn');
+    expect(slide).not.toMatch(/Priya|Natarajan/);
+    expect(slide).toContain('<a:rPr b="1"/><a:t>Nora</a:t>');
+    expect(slide).toContain('<p:ph type="title"/>');
   });
 });
 
