@@ -128,6 +128,17 @@ describe('detectInText', () => {
     );
   });
 
+  it('reads a sentence-start label in any casing without matching prose', () => {
+    const cfg = { rules: { name: true }, customKeywords: [] };
+    expect(detectInText('Account Holder: Marcus Webb', cfg).map((m) => m.value)).toEqual([
+      'Marcus Webb',
+    ]);
+    expect(detectInText('Patient: Jane Doe', cfg).map((m) => m.value)).toEqual(['Jane Doe']);
+    expect(detectInText('Beneficiary: Doe, Jane', cfg).map((m) => m.value)).toEqual(['Doe, Jane']);
+    // Case-folding the label must not turn lowercase prose into a name.
+    expect(detectInText('contact us about the invoice', cfg)).toHaveLength(0);
+  });
+
   it('handles newer street suffixes and social profiles', () => {
     expect(detectInText('12 Windmill Close', { rules: { address: true }, customKeywords: [] })[0].value).toBe(
       '12 Windmill Close',

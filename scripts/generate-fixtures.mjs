@@ -282,7 +282,23 @@ async function docxBuffer() {
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+      '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
       '</Types>',
+  );
+  // Properties are part of the file even though they never print.
+  zip.file(
+    'docProps/core.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+      '<dc:title>KYC profile</dc:title><dc:creator>Marcus Webb</dc:creator>' +
+      '<cp:lastModifiedBy>Jane Doe</cp:lastModifiedBy></cp:coreProperties>',
+  );
+  zip.file(
+    'docProps/app.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">' +
+      '<Company>Northwind Traders</Company><Manager>Priya Natarajan</Manager></Properties>',
   );
   zip.file(
     '_rels/.rels',
@@ -349,7 +365,22 @@ function pptxBuffer() {
       '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' +
       '<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>' +
       '<Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>' +
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+      '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
       '</Types>',
+  );
+  zip.file(
+    'docProps/core.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+      '<dc:title>Q1 hiring review</dc:title><dc:creator>Priya Natarajan</dc:creator>' +
+      '<cp:lastModifiedBy>Diego Marques</cp:lastModifiedBy></cp:coreProperties>',
+  );
+  zip.file(
+    'docProps/app.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">' +
+      '<Company>Contoso</Company><Manager>Amara Okafor</Manager></Properties>',
   );
   zip.file(
     '_rels/.rels',
@@ -407,11 +438,12 @@ addFile('board-deck.pptx', [
 const pdfLines = [
   'NORTHWEST COMMUNITY BANK',
   'Statement of Account',
-  'Account Holder: Marcus Webb',
+  // Split across positioned text runs, the way Word/Quark exporters do.
+  ['Account Holder: Marcus ', ['Webb', 159.49, 'F2']],
   'Account Number: 884201553',
   'Routing Number: 021000021',
   'Address: 742 Evergreen Terrace, Springfield, IL 62704',
-  'Email: marcus.webb@example.com  Phone: +1 (415) 555-0138',
+  ['Email: marcus.webb@', ['example.com  Phone: +1 (415) 555-0138', 150.17, 'F2']],
   'Statement Period: 2024-01-01 to 2024-01-31',
   'Opening Balance: $4,850.00',
   '01/03 TRANSFER TO JANE DOE -$750.00 Balance $4,100.00',
@@ -426,17 +458,32 @@ const pdfLines = [
 
 function pdfBuffer(lines) {
   const escape = (value) => value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-  const content =
-    'BT /F1 10 Tf 50 750 Td 14 TL\n' +
-    lines.map((line) => `(${escape(line)}) Tj T*`).join('\n') +
-    '\nET';
+  // One absolute text matrix per run. A line is a string, or an array of runs
+  // `[text, x]`; the x values below are the exact Helvetica advance widths, so
+  // the fragments sit next to each other the way a real exporter would put
+  // them (a split value, not two columns).
+  const content = lines
+    .map((line, index) => {
+      const y = 750 - index * 14;
+      const runs = Array.isArray(line) ? line : [line];
+      return runs
+        .map((run) => {
+          const [text, x, font = 'F1'] = Array.isArray(run) ? run : [run, 50];
+          // A separate BT/ET per run keeps the exporter's run boundaries, and
+          // the font switch is why they stay distinct text items in pdf.js.
+          return `BT /${font} 10 Tf 1 0 0 1 ${x} ${y} Tm (${escape(text)}) Tj ET`;
+        })
+        .join('\n');
+    })
+    .join('\n');
   const objects = [
     null,
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> /Contents 5 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
   ];
   let pdf = '%PDF-1.4\n';
   const offsets = [];
@@ -445,11 +492,11 @@ function pdfBuffer(lines) {
     pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
   }
   const xref = pdf.length;
-  pdf += 'xref\n0 6\n0000000000 65535 f \n';
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
   for (let i = 1; i < objects.length; i += 1) {
     pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
   }
-  pdf += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(pdf, 'latin1');
 }
 

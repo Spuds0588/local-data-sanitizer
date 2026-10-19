@@ -6,45 +6,49 @@ endobj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> /Contents 5 0 R >>
 endobj
 4 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 906 >>
+<< /Length 1489 >>
 stream
-BT /F1 10 Tf 50 750 Td 14 TL
-(NORTHWEST COMMUNITY BANK) Tj T*
-(Statement of Account) Tj T*
-(Account Holder: Marcus Webb) Tj T*
-(Account Number: 884201553) Tj T*
-(Routing Number: 021000021) Tj T*
-(Address: 742 Evergreen Terrace, Springfield, IL 62704) Tj T*
-(Email: marcus.webb@example.com  Phone: +1 \(415\) 555-0138) Tj T*
-(Statement Period: 2024-01-01 to 2024-01-31) Tj T*
-(Opening Balance: $4,850.00) Tj T*
-(01/03 TRANSFER TO JANE DOE -$750.00 Balance $4,100.00) Tj T*
-(01/05 POS PURCHASE WHOLE FOODS MARKET #1042 -$128.45 Balance $3,971.55) Tj T*
-(01/10 TRANSFER FROM ROBERT CHEN $300.00 Balance $2,071.55) Tj T*
-(01/18 PAYROLL ACME CORPORATION $1,250.00 Balance $3,006.80) Tj T*
-(01/26 TRANSFER TO PRIYA NATARAJAN -$500.00 Balance $4,270.60) Tj T*
-(Closing Balance: $3,368.60) Tj T*
-(Card on file: **** **** **** 1111) Tj T*
-(Questions? Call \(415\) 555-0138 or email marcus.webb@example.com) Tj T*
-ET
+BT /F1 10 Tf 1 0 0 1 50 750 Tm (NORTHWEST COMMUNITY BANK) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 736 Tm (Statement of Account) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 722 Tm (Account Holder: Marcus ) Tj ET
+BT /F2 10 Tf 1 0 0 1 159.49 722 Tm (Webb) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 708 Tm (Account Number: 884201553) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 694 Tm (Routing Number: 021000021) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 680 Tm (Address: 742 Evergreen Terrace, Springfield, IL 62704) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 666 Tm (Email: marcus.webb@) Tj ET
+BT /F2 10 Tf 1 0 0 1 150.17 666 Tm (example.com  Phone: +1 \(415\) 555-0138) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 652 Tm (Statement Period: 2024-01-01 to 2024-01-31) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 638 Tm (Opening Balance: $4,850.00) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 624 Tm (01/03 TRANSFER TO JANE DOE -$750.00 Balance $4,100.00) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 610 Tm (01/05 POS PURCHASE WHOLE FOODS MARKET #1042 -$128.45 Balance $3,971.55) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 596 Tm (01/10 TRANSFER FROM ROBERT CHEN $300.00 Balance $2,071.55) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 582 Tm (01/18 PAYROLL ACME CORPORATION $1,250.00 Balance $3,006.80) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 568 Tm (01/26 TRANSFER TO PRIYA NATARAJAN -$500.00 Balance $4,270.60) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 554 Tm (Closing Balance: $3,368.60) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 540 Tm (Card on file: **** **** **** 1111) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 526 Tm (Questions? Call \(415\) 555-0138 or email marcus.webb@example.com) Tj ET
 endstream
 endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
 xref
-0 6
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000241 00000 n 
-0000000311 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000001862 00000 n 
 trailer
-<< /Size 6 /Root 1 0 R >>
+<< /Size 7 /Root 1 0 R >>
 startxref
-1268
+1937
 %%EOF

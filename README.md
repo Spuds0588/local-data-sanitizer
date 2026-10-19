@@ -49,9 +49,14 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
   `N`/`FN`/`ADR`/`BDAY`/`URL`, iCalendar `ORGANIZER`/`ATTENDEE`/`LOCATION`, XML element and
   attribute names, and SQL `CREATE TABLE`/`INSERT` column order are read as structure — a
   bare `Aisha` in `<FirstName>` or a mysqldump tuple with no column list is typed from its
-  field name. Values split over an iCalendar/vCard fold are rejoined, replaced and folded back
+  field name. Labels may start a sentence (`Patient:`, `Account Holder:`) as well as appear in
+  lower case, without turning ordinary prose into names. Values split over an iCalendar/vCard fold are rejoined, replaced and folded back
   to 75 characters, so the calendar still parses and nothing is reflowed. SQL literals keep
   their quoting and `''` escaping; XML fakes are entity-escaped so the document stays valid.
+- **Document properties:** DOCX/PPTX packages keep a second copy of a person's identity in
+  `docProps/core.xml` and `docProps/app.xml`. `dc:creator`, `cp:lastModifiedBy`, `Company` and
+  `Manager` are typed into the same dictionary and scrubbed with the same fakes, so the author
+  does not survive in the file after the visible text is clean.
 - **Word and PowerPoint runs:** a paragraph is read as one string and written back through the
   same runs, so a name, email or account number Word split across several `<w:t>`/`<a:t>`
   nodes is still detected and replaced as one value. The fake is split on the original word
@@ -167,7 +172,8 @@ manifest in sync; replacements themselves are random per run.
   established by another column, JSON key, table header, label or property in the session;
   there is no general named-entity model. Add it as a custom keyword when it must be caught
   on its own.
-- PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
+- PDFs are still exported as `.txt` (visual layout is not preserved), but runs sharing a
+  baseline are rebuilt into lines, so a value split across several PDF text runs is caught.
 - DOCX/PPTX replacement covers paragraphs, headers, footers, notes and comments, including
   values split across runs; embedded objects (charts, SmartArt, OLE) and images are not read,
   and a text box nested inside another paragraph is handled a paragraph fragment at a time.

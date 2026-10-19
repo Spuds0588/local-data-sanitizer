@@ -9,6 +9,7 @@ import * as jsonlParser from '../parsers/jsonlParser.js';
 import * as htmlParser from '../parsers/htmlParser.js';
 import * as emlParser from '../parsers/emlParser.js';
 import * as pptxParser from '../parsers/pptxParser.js';
+import * as pdfParser from '../parsers/pdfParser.js';
 import { analyzeFiles, sanitizeFiles } from '../engine.js';
 import { DEFAULT_CONFIG } from '../rules.js';
 
@@ -16,6 +17,29 @@ const entries = [
   { id: 'e1', type: 'email', original: 'john@acme.com', fakeValue: 'fake@x.com', enabled: true },
   { id: 'e2', type: 'custom', original: 'Project Phoenix', fakeValue: 'Project Alpha', enabled: true },
 ];
+
+/** Minimal one-page PDF with a synthetic text layer. */
+function buildPdf(content) {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+      '/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return pdf;
+}
 
 describe('jsonParser', () => {
   it('collects keys and string values and sanitizes both', async () => {
@@ -302,6 +326,112 @@ describe('cross-run text in OOXML', () => {
     expect(slide).not.toMatch(/Priya|Natarajan/);
     expect(slide).toContain('<a:rPr b="1"/><a:t>Nora</a:t>');
     expect(slide).toContain('<p:ph type="title"/>');
+  });
+});
+
+describe('pdfParser', () => {
+  // Each Tj is a separate run. 123.93 and 107.8 are the exact Helvetica widths
+  // at 10pt, so the runs are adjacent (kerning split) rather than word-spaced.
+  const content = [
+    'BT /F1 10 Tf 50 750 Td (Account Holder: ) Tj ET',
+    'BT /F1 10 Tf 123.93 750 Td (Marcus Webb) Tj ET',
+    'BT /F1 10 Tf 50 730 Td (Email: jane.d) Tj ET',
+    'BT /F1 10 Tf 107.8 730 Td (oe@acme.example) Tj ET',
+    'BT /F1 10 Tf 50 710 Td (Balance: $1,234.56) Tj ET',
+  ].join('\n');
+
+  const pdfFile = () => new File([buildPdf(content)], 'statement.pdf', { type: 'application/pdf' });
+
+  it('joins runs on the same baseline into readable lines', async () => {
+    const lines = await pdfParser.detect(pdfFile());
+    expect(lines).toEqual([
+      'Account Holder: Marcus Webb',
+      'Email: jane.doe@acme.example',
+      'Balance: $1,234.56',
+    ]);
+  });
+
+  it('detects and replaces a value that the PDF split over several runs', async () => {
+    const file = pdfFile();
+    const found = await analyzeFiles([file], DEFAULT_CONFIG);
+    expect(found).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'name', original: 'Marcus Webb' }),
+        expect.objectContaining({ type: 'email', original: 'jane.doe@acme.example' }),
+      ]),
+    );
+    const [{ blob, name }] = await sanitizeFiles([file], found);
+    expect(name).toBe('statement.sanitized.txt');
+    const out = await blob.text();
+    expect(out).toContain('--- Page 1 ---');
+    expect(out).toMatch(/Account Holder: [^\n]+/);
+    expect(out).toMatch(/Email: [^\s@]+@[^\s]+/);
+    expect(out).toMatch(/Balance: \$[\d,]+\.\d{2}/);
+    expect(out).not.toContain('Marcus Webb');
+    expect(out).not.toContain('jane.doe@acme.example');
+  });
+});
+
+describe('Office document properties', () => {
+  async function docxWithProperties() {
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      '<w:document><w:body><w:p><w:t>Quarterly plan</w:t></w:p></w:body></w:document>',
+    );
+    zip.file(
+      'docProps/core.xml',
+      '<?xml version="1.0"?><cp:coreProperties xmlns:cp="cp" xmlns:dc="dc">' +
+        '<dc:title>Q1 planning</dc:title><dc:creator>Jane Doe</dc:creator>' +
+        '<cp:lastModifiedBy>Robert Chen</cp:lastModifiedBy></cp:coreProperties>',
+    );
+    zip.file(
+      'docProps/app.xml',
+      '<Properties xmlns="app"><Company>Acme Corporation</Company>' +
+        '<Manager>Priya Natarajan</Manager></Properties>',
+    );
+    return new File([await zip.generateAsync({ type: 'nodebuffer' })], 'props.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+  }
+
+  it('types the author, manager and company fields so they join the dictionary', async () => {
+    const found = await analyzeFiles([await docxWithProperties()], DEFAULT_CONFIG);
+    expect(found).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'name', original: 'Jane Doe' }),
+        expect.objectContaining({ type: 'name', original: 'Robert Chen' }),
+        expect.objectContaining({ type: 'name', original: 'Priya Natarajan' }),
+        expect.objectContaining({ type: 'organization', original: 'Acme Corporation' }),
+      ]),
+    );
+  });
+
+  it('scrubs docProps without touching the title or the element structure', async () => {
+    const file = await docxWithProperties();
+    const found = await analyzeFiles([file], DEFAULT_CONFIG);
+    const [{ blob }] = await sanitizeFiles([file], found);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const core = await zip.file('docProps/core.xml').async('string');
+    const app = await zip.file('docProps/app.xml').async('string');
+    expect(core).not.toMatch(/Jane Doe|Robert Chen/);
+    expect(app).not.toMatch(/Acme Corporation|Priya Natarajan/);
+    expect(core).toContain('<dc:title>Q1 planning</dc:title>');
+    expect(core).toContain('<cp:lastModifiedBy>');
+    expect(core).toContain('xmlns:cp="cp"');
+    expect(app).toContain('<Company>');
+    expect(app).toContain('<Manager>');
+    expect(await zip.file('word/document.xml').async('string')).toContain('Quarterly plan');
+  });
+
+  it('rebuilds a DOCX so the properties remain valid XML', async () => {
+    const file = await docxWithProperties();
+    const found = await analyzeFiles([file], DEFAULT_CONFIG);
+    const [{ blob }] = await sanitizeFiles([file], found);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const core = await zip.file('docProps/core.xml').async('string');
+    expect(core.match(/<dc:creator>[^<]+<\/dc:creator>/)).toBeTruthy();
+    expect(core.match(/&(?!amp;|lt;|gt;|quot;|#)/)).toBeNull();
   });
 });
 

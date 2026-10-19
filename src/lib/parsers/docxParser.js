@@ -6,6 +6,7 @@
 import JSZip from 'jszip';
 import { sanitizedName } from '../text.js';
 import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
+import { metadataParts, metadataValues, replaceMetadataText } from './metadata.js';
 import {
   DOCX_PARAGRAPH,
   DOCX_RUN,
@@ -103,6 +104,17 @@ export async function detectWithMeta(file) {
   const moneyNumbers = [];
   titleName(xml, typedValues);
 
+  // Author and company fields live outside the document body. Read them so the
+  // same dictionary that scrubs the text also scrubs the properties.
+  for (const part of await metadataParts(zip)) {
+    for (const item of metadataValues(part.xml)) {
+      segments.push(item.value);
+      if (!item.type) continue;
+      const type = item.type === 'name' && !looksLikeName(item.value) ? 'organization' : item.type;
+      typedValues.push({ original: item.value, type, key: item.field, numeric: false });
+    }
+  }
+
   for (const rows of documentTables(xml)) {
     const headers = rows[0].map((cell) => classifyHeader(cell));
     if (headers.filter(Boolean).length < 2) continue;
@@ -144,6 +156,9 @@ export async function sanitize(file, entries) {
     before += part.xml.length;
     after += updated.length;
     zip.file(part.name, updated);
+  }
+  for (const part of await metadataParts(zip)) {
+    zip.file(part.name, replaceMetadataText(part.xml, entries));
   }
   const blob = await zip.generateAsync({ type: 'blob', mimeType: DOCX_MIME, compression: 'DEFLATE' });
   console.log(`[DOCX Parser] ${file.name}: re-zipped ${parts.length} part(s) (${before} -> ${after} chars).`);

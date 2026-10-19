@@ -8,6 +8,7 @@
 import JSZip from 'jszip';
 import { sanitizedName } from '../text.js';
 import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
+import { metadataParts, metadataValues, replaceMetadataText } from './metadata.js';
 import {
   PPTX_PARAGRAPH,
   PPTX_RUN,
@@ -76,6 +77,16 @@ export async function detectWithMeta(file) {
   const segments = parts.flatMap((part) => paragraphTexts(part.xml, PPTX_PARAGRAPH, PPTX_RUN));
   const typedValues = [];
   const moneyNumbers = [];
+
+  // The deck's author and company fields are part of the package, not a slide.
+  for (const part of await metadataParts(zip)) {
+    for (const item of metadataValues(part.xml)) {
+      segments.push(item.value);
+      if (!item.type) continue;
+      const type = item.type === 'name' && !looksLikeName(item.value) ? 'organization' : item.type;
+      typedValues.push({ original: item.value, type, key: item.field, numeric: false });
+    }
+  }
   for (const part of parts) {
     if (!/\/slides\/slide\d*\.xml$/.test(part.name)) continue;
     titleNames(part.xml, typedValues);
@@ -120,6 +131,9 @@ export async function sanitize(file, entries) {
     before += part.xml.length;
     after += updated.length;
     zip.file(part.name, updated);
+  }
+  for (const part of await metadataParts(zip)) {
+    zip.file(part.name, replaceMetadataText(part.xml, entries));
   }
   const blob = await zip.generateAsync({ type: 'blob', mimeType: PPTX_MIME, compression: 'DEFLATE' });
   console.log(`[PPTX Parser] ${file.name}: re-zipped ${parts.length} part(s) (${before} -> ${after} chars).`);

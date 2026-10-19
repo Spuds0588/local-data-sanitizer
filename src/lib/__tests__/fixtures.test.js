@@ -83,7 +83,7 @@ async function extract(result) {
       const xml = await zip.file(part).async('string');
       texts.push(...paragraphText(xml, /<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g, /<a:t\b[^>]*>([^<]*)<\/a:t>/g));
     }
-    return { name, kind: 'pptx', text: texts.join('\n'), parts: parts.length };
+    return { name, kind: 'pptx', text: texts.join('\n'), parts: parts.length, zip };
   }
   if (/\.docx$/i.test(name)) {
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
@@ -91,7 +91,7 @@ async function extract(result) {
     expect(entry, `${name} must still be a valid docx`).toBeTruthy();
     const xml = await entry.async('string');
     const text = paragraphText(xml, /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, /<w:t\b[^>]*>([^<]*)<\/w:t>/g);
-    return { name, kind: 'docx', text: text.join('\n'), xml };
+    return { name, kind: 'docx', text: text.join('\n'), xml, zip };
   }
   return { name, kind: 'text', text: await blob.text() };
 }
@@ -284,14 +284,20 @@ describe('sensitive-data fixture corpus', () => {
     expect(output.text).not.toContain('Ã');
   }, TIMEOUT);
 
-  it('keeps the DOCX a valid document with its table intact', () => {
-    const { xml, text } = outputs.get('kyc-profile.docx');
+  it('keeps the DOCX a valid document with its table intact', async () => {
+    const { xml, text, zip } = outputs.get('kyc-profile.docx');
     expect(xml).toContain('<w:tbl>');
     expect(xml).toContain('<w:sectPr>');
     expect(xml).toContain('Beneficiary');
     expect(xml).toContain('Share');
     // Label/value spacing survives the amount rewrite.
     expect(text).toMatch(/Annual income: \$[\d,]+\.\d{2}/);
+    // The author and company properties are scrubbed too, not left in the zip.
+    const core = await zip.file('docProps/core.xml').async('string');
+    const app = await zip.file('docProps/app.xml').async('string');
+    expect(core).toContain('<dc:creator>');
+    expect(core).not.toMatch(/Marcus Webb|Jane Doe/);
+    expect(app).not.toMatch(/Northwind Traders|Priya Natarajan/);
   }, TIMEOUT);
 
   it('exports the PDF as readable text with its labels', () => {
@@ -630,16 +636,19 @@ describe('sensitive-data fixture corpus', () => {
     expect(insert).toMatch(/,'\d{3}-\d{2}-\d{4}'/);
   }, TIMEOUT);
 
-  it('keeps the slide deck readable: title, subtitle, table and notes', () => {
-    const { text, parts } = outputs.get('board-deck.pptx');
+  it('keeps the slide deck readable: title, subtitle, table and notes', async () => {
+    const { text, parts, zip } = outputs.get('board-deck.pptx');
     expect(parts).toBe(2);
     expect(text).toContain('Q1 hiring review — confidential');
     expect(text).toContain('Full Name');
     expect(text).toContain('Department');
     expect(text).toContain('Finance');
     expect(text).toContain('Engineering');
-    // 2 title/subtitle runs + 3 rows x 4 cells + 1 speaker-note run.
+    // 2 title/subtitle paragraphs + 3 rows x 4 cells + 1 speaker-note paragraph.
     expect(text.split('\n')).toHaveLength(15);
+    const core = await zip.file('docProps/core.xml').async('string');
+    expect(core).toContain('<dc:creator>');
+    expect(core).not.toMatch(/Priya Natarajan|Diego Marques/);
   }, TIMEOUT);
 
   it('keeps the passport MRZ two valid 44-character lines', () => {
