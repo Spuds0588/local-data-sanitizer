@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -17,6 +17,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The bundle-cache commit below must not start another build.
+    if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,6 +31,30 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /local-data-sanitizer/
+          VITE_STABLE_NAMES: '1'
+
+      # GitHub Pages may still be set to "Deploy from a branch", in which case
+      # GitHub publishes the repo root verbatim after this job. The raw
+      # index.html has no bundler, so it falls back to assets/app.js; keep that
+      # bundle current in the branch.
+      - name: Cache the branch build for GitHub Pages
+        run: |
+          rm -rf assets
+          cp -r dist/assets assets
+          git add -A assets
+          if git diff --cached --quiet; then
+            echo "Branch bundle is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh the branch bundle for GitHub Pages [skip ci]"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -43,38 +69,3 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Check the live page
-        env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          # Give a branch build triggered by this same push time to land, so a
-          # regression is visible in the run instead of a minute later.
-          sleep 60
-          html=$(curl -fsSL "$PAGE_URL")
-          if printf '%s' "$html" | grep -q '/src/main.jsx'; then
-            echo "::warning::$PAGE_URL is serving the branch root, not this deployment. Set Settings -> Pages -> Source to GitHub Actions."
-            exit 1
-          fi
-          echo "$PAGE_URL serves the bundled build."
-
-      # If Pages is still set to "Deploy from a branch", GitHub rebuilds the
-      # repo root on every push and serves index.html verbatim (which points at
-      # /src/main.jsx) until the deploy above replaces it. Switching the source
-      # to Actions stops that branch build. Done last, because the API rejects
-      # the change while the push's own branch build is still running. Best
-      # effort: it needs repository admin, which GITHUB_TOKEN may not have.
-      - name: Point Pages at GitHub Actions
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          sleep 90
-          for attempt in 1 2 3; do
-            if gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow --jq '.build_type'; then
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "::warning::Could not switch Pages to Actions. Set Settings -> Pages -> Source to GitHub Actions."
-          exit 1

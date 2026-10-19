@@ -64,14 +64,13 @@ npm run build    # static output in dist/
   every push to `main` runs `.github/workflows/deploy.yml`, which builds with
   `VITE_BASE_PATH=/local-data-sanitizer/` and publishes `dist/`.
 
-  Once a run has finished, the workflow also switches the Pages source to
-  *GitHub Actions*, which stops GitHub's branch build from briefly serving the
-  unbundled root on later pushes. That API call needs admin rights; if it fails,
-  the run says so and you should set [Settings → Pages → Build and deployment → Source][pages-source] to
-  **GitHub Actions** by hand. While it is set to *Deploy from a branch*, GitHub
-  rebuilds the repo root on every push and serves `index.html` verbatim, which
-  points at the unbundled `/src/main.jsx` and renders a blank page until the
-  workflow's deploy replaces it a moment later.
+  Pages can be configured either way. When GitHub serves the branch instead of
+  the Actions deployment, the raw `index.html` has no bundler and cannot load
+  `/src/main.jsx`, so it falls back to the prebuilt `assets/app.js` that the
+  workflow commits to `main` (a `[skip ci]` bot commit, stable filenames). That
+  keeps the URL working even before the deployment lands. Switching
+  [Settings → Pages → Build and deployment → Source][pages-source] to **GitHub
+  Actions** stops the branch build and makes the fallback unused.
 
 [pages-source]: https://github.com/Spuds0588/local-data-sanitizer/settings/pages
 - **Any static host:** `npm run build` produces a self-contained `dist/` folder.

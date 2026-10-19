@@ -11,6 +11,24 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <!--
+      GitHub Pages can serve this file straight from the branch, where there is
+      no bundler and /src/main.jsx does not exist. Vite rewrites the module tag
+      during the build; the raw file instead falls back to the prebuilt bundle
+      that the deploy workflow commits under /assets.
+    -->
+    <script>
+      window.scrubHubFallback = function () {
+        var css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = './assets/index.css';
+        document.head.appendChild(css);
+        var script = document.createElement('script');
+        script.type = 'module';
+        script.src = './assets/app.js';
+        document.body.appendChild(script);
+      };
+    </script>
+    <script type="module" src="/src/main.jsx" onerror="window.scrubHubFallback()"></script>
   </body>
 </html>
