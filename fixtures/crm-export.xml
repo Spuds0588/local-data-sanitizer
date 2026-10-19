@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<crm:CustomerExport xmlns:crm="urn:example:crm" exportedAt="2024-02-12T09:00:00Z">
+  <crm:Customer id="CUS-88213">
+    <crm:FirstName>Aisha</crm:FirstName>
+    <crm:LastName>Rahman</crm:LastName>
+    <crm:Email>aisha.rahman@northwind.example</crm:Email>
+    <crm:Phone>+44 20 7946 0958</crm:Phone>
+    <crm:DateOfBirth>1991-04-17</crm:DateOfBirth>
+    <crm:Address line1="18 Marsh Lane" city="Manchester" postcode="M14 5TQ" country="GB"/>
+    <crm:AccountNumber>004211889301</crm:AccountNumber>
+    <crm:Balance currency="GBP">2450.00</crm:Balance>
+    <crm:Owner>Priya Natarajan</crm:Owner>
+  </crm:Customer>
+  <crm:Customer id="CUS-88214">
+    <crm:FirstName>Diego</crm:FirstName>
+    <crm:LastName>Marques</crm:LastName>
+    <crm:Contact email="d.marques@contoso.example" phone="+91 98765 43210"/>
+    <crm:Address line1="Rua das Flores 128" city="São Paulo" postcode="01310-100" country="BR"/>
+  </crm:Customer>
+  <crm:Customer id="CUS-88215">
+    <crm:FirstName>Siobhán</crm:FirstName>
+    <crm:LastName>O'Brien</crm:LastName>
+    <crm:Email>siobhan.obrien@example.ie</crm:Email>
+    <crm:Address line1="12 Quay Street" city="Cork" postcode="T12 X8Y2" country="IE"/>
+  </crm:Customer>
+</crm:CustomerExport>

@@ -1,12 +1,24 @@
 // Standard regex detectors + custom keyword matching.
 
 import { parseAmount } from './jiggle.js';
-import { abaValid, einValid, ibanValid } from './identifiers.js';
+import { isMrz } from './mrz.js';
+import {
+  abaValid,
+  einValid,
+  ibanValid,
+  ipv6Valid,
+  nationalIdScheme,
+} from './identifiers.js';
 
 const CURRENCY_CODES = 'USD|EUR|GBP|JPY|CAD|AUD|CHF|INR|MXN|BRL';
 const MONTH_PATTERN =
   'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
-const NAME_PATTERN = "[\\p{L}][\\p{L}'’.-]+(?:\\s+(?:[\\p{L}][\\p{L}'’.-]+|&)){1,3}";
+// A name starts with a capital letter, never spans a line break, and never
+// swallows the following sentence ("contact by email" is not a person).
+const NAME_PATTERN = "[\\p{Lu}][\\p{L}'’.-]+(?:[ \\t]+(?:[\\p{L}][\\p{L}'’.-]+|&)){1,3}";
+// After a title every token must be capitalised: "Dr. Anna Weber is here" is
+// one name and one sentence, not a four-token name.
+const TITLED_NAME_PATTERN = "[\\p{Lu}][\\p{L}'’.-]+(?:[ \\t]+[\\p{Lu}][\\p{L}'’.-]+){0,3}";
 
 export function digitCount(value) {
   return (String(value).match(/\d/g) || []).length;
@@ -145,14 +157,14 @@ export const RULE_DEFS = {
     caseInsensitive: false,
     patterns: [
       new RegExp(
-        '(?<=(?:full name|name|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?|patient|insured|member|tenant|landlord|physician|provider|guardian|parent|witness|signatory|sender|recipient|attendee|organizer|author|seller|buyer|prepared by|approved by)\\s*[:#=-]?\\s*)(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?' +
+        '(?<=(?:full name|name|my name is|i am|this is|signed by|attn\\.?|attention|care of|c\\/o|name of|belongs to|on behalf of|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?|patient|insured|member|tenant|landlord|physician|provider|guardian|parent|witness|signatory|sender|recipient|attendee|organizer|author|seller|buyer|prepared by|approved by)\\s*[:#=-]?\\s*)(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?' +
           NAME_PATTERN +
           '(?:,?\\s+(?:Jr|Sr|II|III|IV)\\.?)?',
         'gu',
       ),
       // CRM/HR "Name: Doe, Jane" form.
       new RegExp(
-        '(?<=(?:full name|name|customer|payee|employee|beneficiary|contact|patient|insured|tenant|landlord|witness|signatory)\\s*[:#=-]\\s*)[\\p{L}][\\p{L}’\'.-]*,\\s*[\\p{L}][\\p{L}’\'.-]*(?:\\s+[\\p{L}][\\p{L}’\'.-]*){0,2}',
+        '(?<=(?:full name|name|customer|payee|employee|beneficiary|contact|patient|insured|tenant|landlord|witness|signatory)\\s*[:#=-]\\s*)[\\p{Lu}][\\p{L}’\'.-]*,[ \\t]*[\\p{L}][\\p{L}’\'.-]*(?:[ \\t]+[\\p{L}][\\p{L}’\'.-]*){0,2}',
         'gu',
       ),
     ],
@@ -166,6 +178,17 @@ export const RULE_DEFS = {
     pattern: new RegExp(
       '(?<=^(?:From|To|Cc|Bcc|Reply-To|Sender):\\s*)(?:(?:Dr|Mr|Ms|Mrs|Prof)\\.?\\s+)?' + NAME_PATTERN,
       'gmu',
+    ),
+  },
+  honorificName: {
+    id: 'name',
+    label: 'Names with a title (Mr, Ms, Dr)',
+    hint: 'Dr. Anna Weber',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: new RegExp(
+      '(?<=\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Rev|Sir|Dame)\\.?[ \\t]+)' + TITLED_NAME_PATTERN,
+      'gu',
     ),
   },
   signatureName: {
@@ -197,6 +220,17 @@ export const RULE_DEFS = {
     pattern: /(?<![\w+])\+\d{1,3}[\s.-]?(?:\(\d{1,4}\)[\s.-]?)?(?:\d[\s.-]?){6,12}\d(?!\d)/g,
     validate: (v) => digitCount(v) >= 8 && digitCount(v) <= 15,
   },
+  phoneNational: {
+    id: 'phone',
+    label: 'National phone formats (UK / EU)',
+    hint: '0161 496 0123, 020 7946 0958',
+    priority: 6,
+    caseInsensitive: false,
+    // A leading 0 plus grouped digits: distinctive enough not to be a date,
+    // an amount, or an account number.
+    pattern: /(?<![\w+])0\d{2,4}[ -]\d{3,4}[ -]\d{3,4}(?![\w])/g,
+    validate: (v) => digitCount(v) >= 9 && digitCount(v) <= 12,
+  },
   medicalId: {
     id: 'medicalId',
     label: 'Medical & insurance IDs',
@@ -213,9 +247,11 @@ export const RULE_DEFS = {
     priority: 3,
     caseInsensitive: true,
     patterns: [
-      /\b(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/in|github\.com|twitter\.com|x\.com)\/[A-Za-z0-9._%-]+/gi,
+      /\b(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/in|github\.com|twitter\.com|x\.com|facebook\.com|instagram\.com|tiktok\.com|threads\.net|youtube\.com|bsky\.app|mastodon\.social)\/[@A-Za-z0-9._%-]+/gi,
       /(?<![\w@])@[A-Za-z0-9_.]{3,30}\b/g,
     ],
+    // `SET @OLD_CHARACTER_SET_CLIENT` in a SQL dump is a variable, not a handle.
+    validate: (value) => !/^@[A-Z0-9_]+$/.test(value),
   },
   swiftBic: {
     id: 'swiftBic',
@@ -233,13 +269,24 @@ export const RULE_DEFS = {
     priority: 2,
     caseInsensitive: true,
     pattern: new RegExp(
-      '(?<=(?:dob|d\\.o\\.b\\.?|date of birth|birth date|born)\\s*(?:is|was)?\\s*[:#=-]?\\s*)(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{4}|(?:' +
+      '(?<=(?:dob|d\\.o\\.b\\.?|date of birth|birth date|born)\\s*(?:is|was|on file)?\\s*[:#=-]?\\s*)(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{4}|(?:' +
         MONTH_PATTERN +
         ')\\.?\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+(?:' +
         MONTH_PATTERN +
         ')\\.?,?\\s+\\d{4})',
       'gi',
     ),
+  },
+  mrz: {
+    id: 'mrz',
+    label: 'Passport / ID machine-readable zones',
+    hint: 'P<UTO… two 44-character lines (check digits verified)',
+    // Runs before the generic rules: the block is one value, and every check
+    // digit must hold before it is accepted.
+    priority: 0,
+    caseInsensitive: false,
+    pattern: /[A-Z0-9<]{30,44}\r?\n[A-Z0-9<]{30,44}/g,
+    validate: isMrz,
   },
   passport: {
     id: 'passport',
@@ -267,6 +314,161 @@ export const RULE_DEFS = {
     pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
     validate: (value) => value.split('.').every((octet) => Number(octet) <= 255),
   },
+  ipv6: {
+    id: 'ipv6',
+    label: 'IPv6 addresses',
+    hint: '2001:db8:85a3::8a2e:370:7334',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /(?<![\w:])[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}(?![\w:])/g,
+    validate: ipv6Valid,
+  },
+  macAddress: {
+    id: 'macAddress',
+    label: 'Device identifiers (MAC)',
+    hint: '00:1B:44:11:3A:B7',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g,
+  },
+  nationalId: {
+    id: 'nationalId',
+    label: 'National IDs (NI, NHS, SIN, CPF, TFN, Aadhaar)',
+    hint: 'QQ 12 34 56 C · 943 476 5919 · 123.456.789-09 (checksum checked)',
+    priority: 1,
+    caseInsensitive: false,
+    patterns: [
+      // UK National Insurance
+      /\b[A-CEGHJ-PR-TW-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D]\b/g,
+      // Brazilian CPF
+      /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g,
+      // NHS number
+      /\b\d{3} \d{3} \d{4}\b/g,
+      // Aadhaar
+      /\b[2-9]\d{3} \d{4} \d{4}\b/g,
+      // Canadian SIN / Australian TFN, spaced
+      /\b\d{3}[ -]\d{3}[ -]\d{3}\b/g,
+      /\b\d{3} \d{3} \d{3}\b/g,
+      // Spanish DNI/NIE and Polish PESEL are unspaced and ambiguous on their
+      // own, so they are only read when the document labels them.
+      /(?<=(?:\bDNI|\bNIE|\bPESEL)\s*[:#=]?\s*)[A-Z0-9]{9,11}\b/gi,
+    ],
+    validate: (value) => Boolean(nationalIdScheme(value)),
+  },
+  vin: {
+    id: 'vin',
+    label: 'Vehicle identification numbers',
+    hint: 'VIN: 1HGCM82633A004352',
+    priority: 2,
+    caseInsensitive: true,
+    // The label is what makes it a VIN (a bare 17-character code could be
+    // anything), but the separator may be a colon, an equals sign or a space.
+    pattern: /(?<=(?:vin|chassis)(?:\s*(?:number|no\.?|#))?\s*[:#=]?\s*)[A-HJ-NPR-Z0-9]{17}\b/g,
+  },
+  cryptoWallet: {
+    id: 'cryptoWallet',
+    label: 'Crypto wallet addresses',
+    hint: '0x71C…, bc1q…, 1A1zP1… (shape kept)',
+    priority: 3,
+    caseInsensitive: false,
+    patterns: [
+      /\b0x[a-fA-F0-9]{40}\b/g,
+      /\bbc1[a-z0-9]{25,62}\b/g,
+      /\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b/g,
+    ],
+  },
+  privateKey: {
+    id: 'privateKey',
+    label: 'Private key blocks',
+    hint: '-----BEGIN PRIVATE KEY----- … (whole block)',
+    priority: 1,
+    caseInsensitive: false,
+    pattern:
+      /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY(?: BLOCK)?-----/g,
+  },
+  credentialUrl: {
+    id: 'credentialUrl',
+    label: 'URLs and connection strings with a password',
+    hint: 'postgres://user:pass@host/db, user:pass@host',
+    // Must win over the email rule: the password@host half looks like one.
+    priority: 0,
+    caseInsensitive: false,
+    pattern: /\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@[^\s/]+/g,
+  },
+  cookie: {
+    id: 'cookie',
+    label: 'Cookies and session headers',
+    hint: 'Cookie: session=…, Set-Cookie: …',
+    priority: 2,
+    caseInsensitive: true,
+    // The match starts at the first cookie name (not the space after the
+    // colon), so the fake rewrites values without eating the header spacing.
+    pattern: /(?<=(?:Cookie|Set-Cookie):[ \t]*)[^ \t\r\n][^\r\n]*/g,
+  },
+  coordinates: {
+    id: 'coordinates',
+    label: 'Geo coordinates',
+    hint: 'lat: 40.7128, lng: -74.0060',
+    priority: 3,
+    caseInsensitive: true,
+    patterns: [
+      /(?<=(?:coordinates?|geo|lat(?:itude)?)\s*[:=]\s*)-?\d{1,3}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}/g,
+      /(?<=(?:lat|latitude|lng|lon|longitude)\s*[:=]\s*)-?\d{1,3}\.\d{4,}(?!\d)/g,
+    ],
+    validate: (value) => {
+      const numbers = String(value).match(/-?\d+(?:\.\d+)?/g) || [];
+      return numbers.every((n) => Math.abs(Number(n)) <= 180);
+    },
+  },
+  postalCode: {
+    id: 'postalCode',
+    label: 'Postcodes (UK / Canada)',
+    hint: 'SW1A 1AA, K1A 0B1',
+    priority: 4,
+    caseInsensitive: false,
+    patterns: [
+      /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/g,
+      /\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/g,
+      // Brazilian CEP
+      /\b\d{5}-\d{3}\b/g,
+      // Irish Eircode: routing key + unique identifier, always spaced in print.
+      /\b[A-Z]\d{2} [A-Z0-9]{4}\b/g,
+      // A bare US ZIP is too common to match unlabelled, so require the label
+      // the export always writes next to it.
+      /(?<=(?:zip|zip code|postal code|postcode)\s*[:#]\s*)\d{5}(?:-\d{4})?\b/gi,
+    ],
+    // The Eircode shape is loose enough to catch a product code; the routing
+    // letters and the mixed alphanumeric identifier are what make it one.
+    validate: (value) => {
+      const eircode = /^([A-Z])(\d{2}) ([A-Z0-9]{4})$/.exec(String(value));
+      if (!eircode) return true;
+      if ('BGIJLMOQSUZ'.includes(eircode[1])) return false;
+      return /[A-Z]/.test(eircode[3]) && /\d/.test(eircode[3]);
+    },
+  },
+  bankCode: {
+    id: 'bankCode',
+    label: 'Local bank codes (sort code, BSB, IFSC, CLABE)',
+    hint: 'Sort code: 12-34-56, BSB: 062-000, IFSC: HDFC0001234',
+    priority: 2,
+    caseInsensitive: true,
+    patterns: [
+      /(?<=(?:sort\s*code|sort|\bsc)\s*[:#=]\s*)\d{2}[- ]?\d{2}[- ]?\d{2}\b/g,
+      /(?<=\bbsb\s*[:#=]?\s*)\d{3}[- ]?\d{3}\b/g,
+      /(?<=\bifsc\s*[:#=]\s*)[A-Z]{4}0[A-Z0-9]{6}\b/g,
+      /(?<=\bclabe\s*[:#=]\s*)\d{18}\b/g,
+    ],
+  },
+  plate: {
+    id: 'plate',
+    label: 'Vehicle registration plates',
+    hint: 'Plate: AB12 CDE, registration: 8XYZ123',
+    priority: 3,
+    caseInsensitive: true,
+    // Only after a label: a bare "AB12 CDE" is indistinguishable from a code.
+    pattern:
+      /(?<=(?:\b(?:license|licence|number) plate\b|\bregistration(?:\s*(?:number|no\.?|#))?\b|\breg\b\.?|\bplate\b)\s*[:#=]?\s*)[A-Z0-9][A-Z0-9 -]{1,8}[A-Z0-9]\b/gi,
+  },
   password: {
     id: 'password',
     label: 'Passwords',
@@ -287,8 +489,29 @@ export const RULE_DEFS = {
       /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g,
       /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
       /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+      // Stripe secret/restricted keys
+      /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b/g,
+      // Google API keys
+      // Real Google keys are 39 chars, but leaked copies are sometimes
+      // truncated or carry a suffix; keep the distinctive prefix either way.
+      /\bAIza[0-9A-Za-z_-]{35,}\b/g,
+      // SendGrid
+      /\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/g,
+      // npm automation tokens
+      /\bnpm_[A-Za-z0-9]{36}\b/g,
+      // DigitalOcean / Shopify
+      /\bdop_v1_[a-f0-9]{64}\b/g,
+      /\bshpat_[a-f0-9]{32}\b/g,
+      // Twilio API key SIDs
+      /\bSK[0-9a-fA-F]{32}\b/g,
+      // Slack incoming-webhook URLs
+      /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/]+/g,
+      // GitHub / GitLab / Stripe webhook secrets in URL paths
+      /(?<=\bwebhook[^\s]{0,20}?[=:]\s*https?:\/\/)[^\s]+/gi,
       /(?<=(?:Authorization:\s*)?Bearer\s+)[A-Za-z0-9._~+/=-]{20,}/g,
       /(?<=x-api-key:\s*)[A-Za-z0-9._-]{16,}/gi,
+      // Secret-bearing environment variables (`AWS_SECRET_ACCESS_KEY=…`).
+      /(?<=(?:AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|CLIENT_SECRET|SECRET_KEY|REFRESH_TOKEN|ACCESS_TOKEN|AUTH_TOKEN|SESSION_TOKEN|PRIVATE_KEY)\s*[:=]\s*["']?)[A-Za-z0-9/+=._-]{16,}/gi,
       /(?<=[?&](?:access_token|api_key|token|key)=)[A-Za-z0-9._~%-]{16,}/gi,
     ],
   },
@@ -299,7 +522,7 @@ export const RULE_DEFS = {
     priority: 3,
     caseInsensitive: false,
     patterns: [
-      /\b\d{1,5}\s+(?:[A-Z][A-Za-z'.-]+\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Parkway|Pkwy|Circle|Cir)\b(?:,?\s*(?:Apt|Suite|Ste|Unit|#)\s*[A-Za-z0-9-]+)?(?:,\s*[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?)?/g,
+      /\b\d{1,5}\s+(?:[A-Z][A-Za-z'.-]+\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Close|Cl|Mews|Row|Walk|Grove|Gr|Crescent|Cres|Square|Sq|Rise|Vale|Quay|Green|Highway|Hwy|Route|Rte|Trail|Trl|Plaza|Plz|Esplanade|Esp|Gardens|Gdns|Park|View|Hill|Broadway|Alley|Aly|Bend|Cove|Loop|Path|Pike|Point|Ridge|Summit)\b(?:,?\s*(?:Apt|Suite|Ste|Unit|#)\s*[A-Za-z0-9-]+)?(?:,\s*[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?)?/g,
       // PO boxes appear in bank/KYC exports without a street number.
       /\bP\.?\s?O\.?\s+Box\s+\d+\b(?:,\s*[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)?/gi,
     ],
@@ -369,8 +592,21 @@ export const DEFAULT_CONFIG = {
     name: true,
     dob: true,
     passport: true,
+    mrz: true,
     license: true,
     ipAddress: true,
+    ipv6: true,
+    macAddress: true,
+    nationalId: true,
+    vin: true,
+    cryptoWallet: true,
+    privateKey: true,
+    credentialUrl: true,
+    cookie: true,
+    coordinates: true,
+    postalCode: true,
+    bankCode: true,
+    plate: true,
     password: true,
     apiKey: true,
     address: true,

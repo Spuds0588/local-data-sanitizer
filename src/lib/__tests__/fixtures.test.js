@@ -15,6 +15,7 @@ import { analyzeFiles, sanitizeFiles } from '../engine.js';
 import { DEFAULT_CONFIG } from '../rules.js';
 import { escapeRegExp } from '../text.js';
 import { parseCsv } from '../csv.js';
+import { parseMrz } from '../mrz.js';
 
 const FIXTURES = path.resolve(process.cwd(), 'fixtures');
 const TIMEOUT = 60_000;
@@ -71,6 +72,16 @@ async function extract(result) {
     const wb = XLSX.read(await blob.arrayBuffer(), { type: 'array', cellNF: true, cellText: true });
     return { name, kind: 'sheet', text: sheetText(wb), wb };
   }
+  if (/\.pptx$/i.test(name)) {
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const parts = Object.keys(zip.files).filter((part) => /^ppt\/(slides|notesSlides)\/.+\.xml$/.test(part));
+    const texts = [];
+    for (const part of parts) {
+      const xml = await zip.file(part).async('string');
+      for (const match of xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)) texts.push(match[1]);
+    }
+    return { name, kind: 'pptx', text: texts.join('\n'), parts: parts.length };
+  }
   if (/\.docx$/i.test(name)) {
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const entry = zip.file('word/document.xml');
@@ -115,6 +126,27 @@ function textRegExp(value) {
   return /^[A-Za-z]+$/.test(value) ? new RegExp(`\\b${escaped}\\b`, 'i') : new RegExp(escaped, 'i');
 }
 
+/** Decode a quoted-printable part back to text (for the encoded-email test). */
+function decodeQuotedPrintable(text) {
+  const input = text.replace(/=\r?\n/g, '');
+  const bytes = [];
+  for (let i = 0; i < input.length; i += 1) {
+    if (input[i] === '=' && /^[0-9A-Fa-f]{2}$/.test(input.slice(i + 1, i + 3))) {
+      bytes.push(parseInt(input.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(input.charCodeAt(i));
+    }
+  }
+  return Buffer.from(bytes).toString('utf8');
+}
+
+/** The body of one MIME part (everything after its header block). */
+function mimePartBody(piece) {
+  const index = piece.search(/\r?\n\r?\n/);
+  return index === -1 ? piece : piece.slice(index).replace(/^\r?\n\r?\n/, '');
+}
+
 beforeAll(async () => {
   faker.seed(20_240_201);
   manifest = JSON.parse(await fs.readFile(path.join(FIXTURES, 'manifest.json'), 'utf8'));
@@ -157,6 +189,19 @@ describe('sensitive-data fixture corpus', () => {
           failures.push(
             `${output.name}: ${secret.match} "${secret.value}" survived near "${snippet(output.text, found.index)}"`,
           );
+          continue;
+        }
+        // A cell sits between commas, which the number matcher's lookbehind
+        // rejects; compare parsed rows as well so a number cannot hide there.
+        if (secret.match === 'number' && output.rows) {
+          const target = Number(String(secret.value).replace(/[^0-9.-]/g, ''));
+          const cell = output.rows.flat().find((value) => {
+            const text = String(value).trim();
+            return text !== '' && Number(text.replace(/[^0-9.-]/g, '')) === target && /\d/.test(text);
+          });
+          if (cell !== undefined) {
+            failures.push(`${output.name}: number "${secret.value}" survived in cell "${cell}"`);
+          }
         }
       }
     }
@@ -345,7 +390,8 @@ describe('sensitive-data fixture corpus', () => {
     const { text } = outputs.get('contacts.vcf');
     expect(text.startsWith('BEGIN:VCARD')).toBe(true);
     expect(text.trimEnd().endsWith('END:VCARD')).toBe(true);
-    const lines = linesOf(text).filter(Boolean);
+    // Long values may be folded for transport; unfold for property checks.
+    const lines = linesOf(text.replace(/\r\n /g, '')).filter(Boolean);
     expect(lines).toContain('VERSION:3.0');
     // N has five semicolon-separated components, like the original.
     const n = lines.find((line) => line.startsWith('N:'));
@@ -418,6 +464,207 @@ describe('sensitive-data fixture corpus', () => {
     expect(text).toContain('Authorization: Bearer ');
     expect(lines[1]).toMatch(/^2024-02-03T14:22:05Z WARN auth user_id=[A-Z]{3}-\d{5} email=\S+ ip=\d+\.\d+\.\d+\.\d+ status=ok$/);
     expect(lines[5]).toMatch(/phone=\(\d{3}\)\d{3}-\d{4} owner=\S+@\S+$/);
+  }, TIMEOUT);
+
+  it('keeps the international claims grid and national ID shapes', () => {
+    const { rows } = outputs.get('insurance-claims.csv');
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toEqual([
+      'Claim ID', 'Member Name', 'Date of Birth', 'NI Number', 'NHS Number',
+      'CPF', 'Aadhaar', 'SIN', 'TFN', 'Phone', 'Address', 'Postcode', 'Payout', 'Notes',
+    ]);
+    for (const row of rows.slice(1)) expect(row).toHaveLength(14);
+
+    // Every scheme keeps its own punctuation and width.
+    expect(rows[1][3]).toMatch(/^[A-Z]{2} \d{2} \d{2} \d{2} [A-D]$/);
+    expect(rows[1][4]).toMatch(/^\d{3} \d{3} \d{4}$/);
+    expect(rows[2][5]).toMatch(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/);
+    expect(rows[3][6]).toMatch(/^\d{4} \d{4} \d{4}$/);
+    expect(rows[4][7]).toMatch(/^\d{3}-\d{3}-\d{3}$/);
+    expect(rows[4][8]).toMatch(/^\d{3} \d{3} \d{3}$/);
+    expect(rows[1][9]).toMatch(/^\+44 \d{2} \d{4} \d{4}$/);
+    expect(rows[2][9]).toMatch(/^\+55 \d{2} \d{5}-\d{4}$/);
+    expect(rows[3][9]).toMatch(/^\+91 \d{5} \d{5}$/);
+    // Postcodes keep their country's pattern, not a US ZIP.
+    expect(rows[1][11]).toMatch(/^[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}$/);
+    expect(rows[2][11]).toMatch(/^\d{5}-\d{3}$/);
+    expect(rows[3][11]).toMatch(/^\d{6}$/);
+    expect(rows[4][11]).toMatch(/^[A-Z]\d[A-Z] \d[A-Z]\d$/);
+    expect(rows[1][13]).toMatch(/^Callback on \d{4} \d{3} \d{4}\.$/);
+  }, TIMEOUT);
+
+  it('keeps the HTML report markup and table structure', () => {
+    const { text } = outputs.get('hr-records.html');
+    expect(text.startsWith('<!doctype html>')).toBe(true);
+    expect(text).toContain('<title>Employee Records — Q1</title>');
+    expect(text).toContain('<table class="employees">');
+    expect(text).toContain('<table class="kv">');
+    expect(text).toContain('<th>Full Name</th>');
+    expect(text).toMatch(/<td>EMP-\d{4}<\/td>/);
+    // 1 thead row + 3 employee rows + 3 label/value rows.
+    expect((text.match(/<tr>/g) || [])).toHaveLength(7);
+    expect((text.match(/<td>/g) || [])).toHaveLength(27);
+    expect(text).toMatch(/<a href="mailto:[^"@]+@[^"]+">[^<@]+@[^<]+<\/a>/);
+    expect(text).not.toContain('mailto:hr@northwind.example');
+    for (const label of ['Name', 'Phone', 'Email']) expect(text).toContain(`<th>${label}</th>`);
+    expect(text).toMatch(/<p>Questions: <a href="mailto:[^"]+">[^<]+<\/a> or \(\d{3}\) \d{3}-\d{4}\.<\/p>/);
+  }, TIMEOUT);
+
+  it('keeps the env file parseable and every secret recognisable', () => {
+    const { text } = outputs.get('app-config.env');
+    const value = (key) => {
+      const match = new RegExp(`^${key}=(.*)$`, 'm').exec(text);
+      return match ? match[1] : '';
+    };
+    expect(text).toContain('# Production configuration');
+    expect(value('APP_ENV')).toBe('production');
+    // Connection strings keep scheme, port and database name.
+    expect(value('DATABASE_URL')).toMatch(/^postgres:\/\/[^:]+:[^@]+@[^/\s]+:5432\/orders$/);
+    expect(value('REDIS_URL')).toMatch(/^redis:\/\/[^:]+:[^@]+@[^/\s]+:6379\/0$/);
+    // Key prefixes survive, so the reader still knows what the key was.
+    expect(value('STRIPE_SECRET_KEY')).toMatch(/^sk_live_[A-Za-z0-9]{16,}$/);
+    expect(value('GOOGLE_MAPS_API_KEY')).toMatch(/^AIza[0-9A-Za-z_-]{35}$/);
+    expect(value('SENDGRID_API_KEY')).toMatch(/^SG\.[\w-]{16,}\.[\w-]{16,}$/);
+    expect(value('TWILIO_API_KEY')).toMatch(/^SK[0-9a-f]{32}$/);
+    expect(value('NPM_TOKEN')).toMatch(/^npm_[A-Za-z0-9]{36}$/);
+    expect(value('SLACK_WEBHOOK')).toMatch(/^https:\/\/hooks\.slack\.com\/services\/[A-Z0-9]+\/[A-Z0-9]+\/[A-Z0-9]+$/);
+    expect(value('AWS_ACCESS_KEY_ID')).toMatch(/^AKIA[A-Z0-9]{16}$/);
+    expect(value('ADMIN_EMAIL')).toMatch(/^[^@\s]+@[^@\s]+$/);
+    expect(value('SUPPORT_PHONE')).toMatch(/^\+44 \d{2} \d{4} \d{4}$/);
+    expect(value('OFFICE_IP')).toMatch(/^[0-9a-f:]+$/);
+    expect(value('PRINTER_MAC')).toMatch(/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/);
+    // Header attributes are structure; only the session value changes.
+    expect(value('SESSION_COOKIE')).toMatch(/^session=[0-9a-f]{32}; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
+    expect(text).toContain('-----BEGIN OPENSSH PRIVATE KEY-----');
+    expect(text).toContain('-----END OPENSSH PRIVATE KEY-----');
+  }, TIMEOUT);
+
+  it('keeps the YAML profile nested and its values typed', () => {
+    const { text } = outputs.get('customer-profile.yaml');
+    expect(text).toContain('# Customer profile — internal use only');
+    expect(text).toMatch(/^customer:$/m);
+    expect(text).toMatch(/^  id: [A-Z]{3}-\d{5}$/m);
+    expect(text).toMatch(/^  full_name: .+$/m);
+    expect(text).toMatch(/^  phone: "\+\d{2} \d{2} \d{2} \d{2} \d{2}"$/m);
+    expect(text).toMatch(/^  date_of_birth: \d{4}-\d{2}-\d{2}$/m);
+    expect(text).toMatch(/^  national_id: "[A-Z]{2} \d{2} \d{2} \d{2} [A-D]"$/m);
+    expect(text).toMatch(/^  address:$/m);
+    expect(text).toMatch(/^    line1: "[^"]+"$/m);
+    expect(text).toMatch(/^    postal_code: "\d{4}"$/m);
+    expect(text).toMatch(/^  vehicle_vin: [A-HJ-NPR-Z0-9]{17}$/m);
+    expect(text).toMatch(/^  crypto_wallet: "0x[a-f0-9]{40}"$/m);
+    expect(text).toMatch(/^  last_login:$/m);
+    expect(text).toMatch(/^    ip: \d+\.\d+\.\d+\.\d+$/m);
+    expect(text).toMatch(/^    at: 2024-02-11T08:14:00Z$/m);
+    expect(text).toMatch(/^  coordinates: "-?\d+\.\d+, -?\d+\.\d+"$/m);
+  }, TIMEOUT);
+
+  it('decodes, scrubs and re-encodes an encoded email', async () => {
+    const { text } = outputs.get('mail-encoded.eml');
+    const lines = text.split(/\r?\n/);
+    expect(text).toContain('boundary="----=_Part_Encoded_1"');
+    expect(lines.filter((line) => line === 'Content-Transfer-Encoding: base64')).toHaveLength(2);
+    expect(lines.filter((line) => line === 'Content-Transfer-Encoding: quoted-printable')).toHaveLength(1);
+    // Nothing from the encoded words or the QP body survives in raw form.
+    expect(text).not.toContain('Wm/DqyBMYXVyZW50');
+    expect(text).not.toContain('Zo=C3=AB');
+    expect(text).not.toMatch(/Zoë/);
+
+    const pieces = text.split(/\r\n------=_Part_Encoded_1/);
+    expect(pieces).toHaveLength(5);
+    const plain = decodeQuotedPrintable(mimePartBody(pieces[1]));
+    expect(plain).toMatch(/Call \d{2,4} \d{3,4} \d{4}/);
+    expect(plain).toMatch(/Date of birth on file: \d{4}-\d{2}-\d{2}\./);
+    expect(plain).toMatch(/\r\nThanks,\r\n[A-Za-z' -]+\r\n/);
+    expect(plain).not.toContain('1982-05-17');
+
+    const html = Buffer.from(mimePartBody(pieces[2]).replace(/\s+/g, ''), 'base64').toString('utf8');
+    expect(html).toMatch(/^<html><body>/);
+    expect(html).toMatch(/<p>[^<]+ — \(?\d{2,4}\)?[\d ]+<\/p>/);
+
+    // Attachment bytes are untouched; only the filename is scrubbed.
+    const original = await fs.readFile(path.join(FIXTURES, 'mail-encoded.eml'), 'utf8');
+    const originalAttachment = mimePartBody(original.split(/\r\n------=_Part_Encoded_1/)[3]).trim();
+    expect(mimePartBody(pieces[3]).trim()).toBe(originalAttachment);
+    expect(pieces[3]).toMatch(/filename="[^"]+ - statement\.pdf"/);
+    expect(pieces[3]).not.toContain('Zoë Laurent - statement.pdf');
+  }, TIMEOUT);
+
+  it('keeps the XML export well-formed and element/attribute names intact', () => {
+    const { text } = outputs.get('crm-export.xml');
+    expect(text.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
+    expect(text).toContain('<crm:CustomerExport xmlns:crm="urn:example:crm" exportedAt="2024-02-12T09:00:00Z">');
+    expect((text.match(/<crm:Customer id="CUS-\d{5}">/g) || [])).toHaveLength(3);
+    expect(text).toMatch(/<crm:Phone>\+44 \d{2} \d{4} \d{4}<\/crm:Phone>/);
+    expect(text).toMatch(/<crm:DateOfBirth>\d{4}-\d{2}-\d{2}<\/crm:DateOfBirth>/);
+    expect(text).toMatch(/<crm:Balance currency="GBP">\d+\.\d{2}<\/crm:Balance>/);
+    expect(text).toMatch(/<crm:AccountNumber>\d{12}<\/crm:AccountNumber>/);
+    // Attribute values are scrubbed, the attribute names and country stay.
+    expect(text).toMatch(/<crm:Contact email="[^"@]+@[^"]+" phone="\+91 \d{5} \d{5}"\/>/);
+    expect(text).toMatch(/<crm:Address line1="[^"]+" city="[^"]+" postcode="[A-Z]\d{2} [A-Z0-9]{4}" country="IE"\/>/);
+    expect(text).toContain('country="BR"');
+    // No unescaped ampersand crept in, so the document still parses.
+    expect(text).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#)/);
+  }, TIMEOUT);
+
+  it('keeps the SQL dump executable: quoting, tuple count and money columns', () => {
+    const { text } = outputs.get('customers-dump.sql');
+    expect(text).toContain('/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;');
+    expect(text).toContain('CREATE TABLE `customers` (');
+    expect(text).toContain('LOCK TABLES `customers` WRITE;');
+    expect(text).toContain('UNLOCK TABLES;');
+
+    const insert = text.slice(text.indexOf('INSERT INTO'));
+    // Three rows, still one INSERT statement, still 10 columns each.
+    expect((insert.match(/\(\d+,'/g) || [])).toHaveLength(3);
+    expect(insert).toMatch(/VALUES \(1,'/);
+    expect(insert).toMatch(/,\d+\.\d{2}\),\(/);
+    expect(insert).toMatch(/,\d+\.\d{2}\);/);
+    // Every quote is paired, and the name with an apostrophe was re-escaped.
+    expect(((insert.match(/'/g) || []).length) % 2).toBe(0);
+    expect(insert).not.toContain("O''Brien");
+    expect(insert).toMatch(/,'\d{3}-\d{2}-\d{4}'/);
+  }, TIMEOUT);
+
+  it('keeps the slide deck readable: title, subtitle, table and notes', () => {
+    const { text, parts } = outputs.get('board-deck.pptx');
+    expect(parts).toBe(2);
+    expect(text).toContain('Q1 hiring review — confidential');
+    expect(text).toContain('Full Name');
+    expect(text).toContain('Department');
+    expect(text).toContain('Finance');
+    expect(text).toContain('Engineering');
+    // 2 title/subtitle runs + 3 rows x 4 cells + 1 speaker-note run.
+    expect(text.split('\n')).toHaveLength(15);
+  }, TIMEOUT);
+
+  it('keeps the passport MRZ two valid 44-character lines', () => {
+    const { text } = outputs.get('passport-mrz.txt');
+    const lines = text.split(/\r?\n/).filter((line) => /^[A-Z0-9<]{30,44}$/.test(line));
+    expect(lines).toHaveLength(2);
+    expect(lines.map((line) => line.length)).toEqual([44, 44]);
+    const parsed = parseMrz(lines.join('\n'));
+    expect(parsed, 'the sanitized MRZ must still pass every check digit').toBeTruthy();
+    expect(parsed.passport).not.toBe('L898902C3');
+    // The surrounding dossier text keeps its labels and prose.
+    expect(text).toContain('Applicant: ');
+    expect(text).toContain('Machine-readable zone:');
+    expect(text).toContain('Verified against the original document on 2024-02-12.');
+  }, TIMEOUT);
+
+  it('keeps LDIF attribute lines parseable', () => {
+    const { text } = outputs.get('directory-export.ldif');
+    expect((text.match(/^dn: cn=.+,ou=People,dc=example,dc=com$/gm) || [])).toHaveLength(2);
+    for (const attribute of [
+      'cn', 'sn', 'givenName', 'mail', 'telephoneNumber', 'uid', 'employeeNumber',
+      'homePostalAddress', 'userPassword',
+    ]) {
+      expect(text, `missing ${attribute}`).toMatch(new RegExp(`^${attribute}: `, 'm'));
+    }
+    // Passwords keep their hash prefix and base64 shape.
+    expect((text.match(/userPassword: \{SSHA\}[A-Za-z0-9+/=]+/g) || [])).toHaveLength(2);
+    // One blank separator between records plus the trailing newline.
+    expect(text.split(/\r?\n/).filter((line) => line.trim() === '')).toHaveLength(2);
   }, TIMEOUT);
 
   it('keeps one fake identity across every document that mentions it', () => {

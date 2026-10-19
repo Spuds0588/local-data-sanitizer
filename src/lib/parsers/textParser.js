@@ -1,11 +1,12 @@
-// Plain-text family: .txt / .md / .log / .eml / .vcf / .ics / .xml / .html.
+// Plain-text family: .txt / .md / .log / .vcf / .ics / .xml / .yaml / .ini /
+// .env / .ldif / .sql / .srt / .vtt.
 //
 // These formats have no cell grid to type values from, but they do have
-// structure: `Label: value` lines, email headers, vCard properties and iCalendar
-// parameters. We read that structure for detection, then replace only the exact
-// values in the original text. Nothing is reflowed, re-encoded or rebuilt, so
-// the document keeps its layout, line endings, MIME boundaries and calendar
-// folding.
+// structure: `Label: value` lines, `key=value` fields, vCard properties and
+// iCalendar parameters. We read that structure for detection, then replace only
+// the exact values in the original text. Nothing is reflowed or rebuilt, so the
+// document keeps its layout, line endings and calendar folding. (Email and HTML
+// have their own parsers.)
 
 import { applyEntriesToText, sanitizedName } from '../text.js';
 import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
@@ -16,12 +17,19 @@ const MIME = {
   md: 'text/markdown',
   markdown: 'text/markdown',
   log: 'text/plain',
-  eml: 'message/rfc822',
   vcf: 'text/vcard',
   ics: 'text/calendar',
   xml: 'application/xml',
-  html: 'text/html',
-  htm: 'text/html',
+  yaml: 'application/yaml',
+  yml: 'application/yaml',
+  ini: 'text/plain',
+  cfg: 'text/plain',
+  conf: 'text/plain',
+  env: 'text/plain',
+  ldif: 'text/plain',
+  sql: 'application/sql',
+  srt: 'text/plain',
+  vtt: 'text/vtt',
 };
 
 export const TEXT_EXTENSIONS = Object.keys(MIME);
@@ -42,7 +50,10 @@ function addTyped(typedValues, type, raw, key) {
 
 // `Label: value` / `**Label:** value` / `# Patient: Name` / `user_id=…`.
 const LABEL_LINE = /^\s*(?:[>#]+\s*|[-*+]\s+)?(?:\*\*|__)?([A-Za-z][A-Za-z0-9 /_.#()'’-]{1,40}?)(?:\*\*|__)?\s*[:=]\s*(.+?)\s*$/;
-const PAIR = /(?:^|[\s;,&?])([A-Za-z][A-Za-z0-9_]{1,30})=([^\s;,&]+)/g;
+// A quoted value may contain spaces (`city="São Paulo"`), so prefer the
+// quoted form over the bare one; otherwise the value would be cut at the space
+// and only "São" would be typed.
+const PAIR = /(?:^|[\s;,&?])([A-Za-z][A-Za-z0-9_]{1,30})=(?:"([^"]*)"|'([^']*)'|([^\s;,&]+))/g;
 const PAIR_SKIP = new Set([
   'http', 'https', 'href', 'src', 'class', 'style', 'width', 'height',
   'version', 'charset', 'boundary', 'xmlns', 'type', 'level', 'size',
@@ -73,7 +84,7 @@ function typedKeyValues(text, typedValues) {
     while ((match = PAIR.exec(line)) !== null) {
       const key = match[1];
       if (PAIR_SKIP.has(key.toLowerCase())) continue;
-      const raw = match[2].replace(/["']$/, '');
+      const raw = (match[2] ?? match[3] ?? match[4] ?? '').trim();
       if (raw.length < 3 || raw.length > 160) continue;
       const type = classifyHeader(key);
       if (!type) continue;
@@ -115,6 +126,158 @@ function typedMarkdownTables(text, typedValues) {
   }
 }
 
+// XML/SOAP exports put the field name in the tag or the attribute, which is
+// the same signal a CSV header gives. Only leaf elements (no child markup) are
+// read, and the file is still rewritten by plain literal replacement, so tags,
+// namespaces, indentation and declarations stay untouched.
+const XML_ELEMENT = /<([A-Za-z][\w.:-]*)\b[^<>]*>([^<>]+)<\/\1\s*>/g;
+const XML_ATTRIBUTE = /\b([A-Za-z][\w.:-]*)\s*=\s*"([^"<>]+)"/g;
+const XML_SKIP_ATTRIBUTES = new Set(['xmlns', 'version', 'encoding', 'schemaLocation', 'noNamespaceSchemaLocation']);
+
+function localName(name) {
+  return String(name).split(':').pop();
+}
+
+function xmlValues(text, typedValues) {
+  XML_ELEMENT.lastIndex = 0;
+  let match;
+  while ((match = XML_ELEMENT.exec(text)) !== null) {
+    const type = classifyHeader(localName(match[1]));
+    if (type) addTyped(typedValues, type, match[2], localName(match[1]));
+  }
+  XML_ATTRIBUTE.lastIndex = 0;
+  while ((match = XML_ATTRIBUTE.exec(text)) !== null) {
+    const name = localName(match[1]);
+    if (XML_SKIP_ATTRIBUTES.has(name)) continue;
+    const type = classifyHeader(name);
+    if (type) addTyped(typedValues, type, match[2], name);
+  }
+}
+
+/**
+ * Split one `VALUES (...), (...)` list. Quoted strings are unescaped (`''` and
+ * `\'`) so the typed value matches the real data; the position tracking is only
+ * needed to know where the statement ends.
+ */
+function sqlTuples(text, start) {
+  const tuples = [];
+  let i = start;
+  while (i < text.length) {
+    while (i < text.length && /\s/.test(text[i])) i += 1;
+    if (text[i] !== '(') break;
+    i += 1;
+    const values = [];
+    let value = '';
+    let quoted = false;
+    for (; i < text.length; i += 1) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === "'") {
+          if (text[i + 1] === "'") {
+            value += "'";
+            i += 1;
+          } else {
+            quoted = false;
+          }
+        } else if (ch === '\\' && text[i + 1] === "'") {
+          value += "'";
+          i += 1;
+        } else {
+          value += ch;
+        }
+      } else if (ch === "'") {
+        quoted = true;
+      } else if (ch === ',') {
+        values.push(value);
+        value = '';
+      } else if (ch === ')') {
+        values.push(value);
+        i += 1;
+        break;
+      } else {
+        value += ch;
+      }
+    }
+    tuples.push(values.map((cell) => cell.trim()));
+    while (i < text.length && /\s/.test(text[i])) i += 1;
+    if (text[i] !== ',') break;
+    i += 1;
+  }
+  return tuples;
+}
+
+/**
+ * Split a CREATE TABLE body / an INSERT column list on commas that are not
+ * inside parentheses (`decimal(10,2)`, `enum('a','b')`).
+ */
+function splitColumns(text) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of String(text)) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
+function columnName(definition) {
+  const match = /^\s*[`"[]?([A-Za-z_][\w$]*)[`"\]]?/.exec(definition);
+  return match ? match[1] : '';
+}
+
+const SQL_RESERVED_COLUMNS = /^\s*(?:PRIMARY|UNIQUE|KEY|INDEX|CONSTRAINT|FOREIGN|FULLTEXT|SPATIAL|CHECK)\b/i;
+const SQL_CREATE = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"[]?([\w.]+)[`"\]]?\s*\(([\s\S]*?)\)\s*(?:ENGINE\b|DEFAULT\s+CHARSET|CHARSET\b|;)/gi;
+const SQL_INSERT = /\bINSERT\s+INTO\s+[`"[]?([\w.]+)[`"\]]?\s*(?:\(([^)]*)\))?\s*VALUES\s*/gi;
+
+function tableKey(name) {
+  return String(name).replace(/[`"\[\]]/g, '').split('.').pop().toLowerCase();
+}
+
+/**
+ * `INSERT INTO customers (first_name, email) VALUES (…)` names every column.
+ * A mysqldump `INSERT INTO customers VALUES (…)` omits the list, so the order
+ * comes from the CREATE TABLE in the same dump — otherwise every value would
+ * be invisible to the column typing.
+ */
+function sqlValues(text, typedValues) {
+  const tables = new Map();
+  SQL_CREATE.lastIndex = 0;
+  let create;
+  while ((create = SQL_CREATE.exec(text)) !== null) {
+    const columns = splitColumns(create[2])
+      .filter((definition) => !SQL_RESERVED_COLUMNS.test(definition))
+      .map(columnName)
+      .filter(Boolean);
+    if (columns.length) tables.set(tableKey(create[1]), columns);
+  }
+
+  SQL_INSERT.lastIndex = 0;
+  let match;
+  while ((match = SQL_INSERT.exec(text)) !== null) {
+    const columns = match[2]
+      ? match[2].split(',').map((column) => columnName(column))
+      : tables.get(tableKey(match[1])) || [];
+    if (!columns.length) continue;
+    const types = columns.map((column) => classifyHeader(column));
+    if (!types.some(Boolean)) continue;
+    for (const row of sqlTuples(text, SQL_INSERT.lastIndex)) {
+      row.forEach((value, index) => {
+        if (types[index] && value && value.toUpperCase() !== 'NULL') {
+          addTyped(typedValues, types[index], value, columns[index]);
+        }
+      });
+    }
+  }
+}
+
 const LIST_LABELS = new Set(['attendees', 'participants', 'present', 'recipients', 'to', 'cc', 'bcc', 'invitees', 'members']);
 
 /** `Attendees: A, B` / `To: A <a@x>, B <b@x>` list names, not one blob. */
@@ -135,22 +298,6 @@ function typedNameLists(text, typedValues) {
 
 function unfolded(text) {
   return text.replace(/\r?\n[ \t]/g, '');
-}
-
-function emailHeaders(text, typedValues) {
-  const end = text.search(/\r?\n\r?\n/);
-  const head = unfolded(end === -1 ? text : text.slice(0, end));
-  const wanted = /^(From|To|Cc|Bcc|Reply-To|Sender):\s*(.*)$/i;
-  for (const line of head.split(/\r?\n/)) {
-    const match = wanted.exec(line);
-    if (!match) continue;
-    for (const part of match[2].split(/,(?![^<]*>)/)) {
-      const display = /^\s*"?([^"<]+?)"?\s*<[^>]+>/.exec(part);
-      if (!display) continue;
-      const name = display[1].trim().replace(/^"|"$/g, '');
-      if (looksLikeName(name)) addTyped(typedValues, 'name', name, match[1]);
-    }
-  }
 }
 
 function vcardValues(text, typedValues) {
@@ -215,7 +362,8 @@ export async function detectWithMeta(file) {
   typedKeyValues(text, typedValues);
   typedNameLists(text, typedValues);
   typedMarkdownTables(text, typedValues);
-  if (/\.eml$/i.test(file.name)) emailHeaders(text, typedValues);
+  if (/\.xml$/i.test(file.name)) xmlValues(text, typedValues);
+  if (/\.sql$/i.test(file.name)) sqlValues(text, typedValues);
   if (/\.vcf$/i.test(file.name)) vcardValues(text, typedValues);
   if (/\.ics$/i.test(file.name)) icsValues(text, typedValues);
 
@@ -270,7 +418,12 @@ export async function sanitize(file, entries) {
       name: sanitizedName(file.name, ext || 'txt'),
     };
   }
-  const output = applyEntriesToText(text, textEntries);
+  // A fake may contain `&` or `<`; in XML those must be escaped or the
+  // document stops parsing. SQL needs the same care with apostrophes.
+  const output = applyEntriesToText(text, textEntries, {
+    xmlSafe: /\.xml$/i.test(file.name),
+    sqlSafe: /\.sql$/i.test(file.name),
+  });
   const ext = (/\.[^.]+$/.exec(file.name)?.[0] || '.txt').slice(1).toLowerCase();
   console.log(`[Text Parser] ${file.name}: ${text.length} -> ${output.length} chars.`);
   return {

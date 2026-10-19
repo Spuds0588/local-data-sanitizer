@@ -1,0 +1,23 @@
+dn: cn=Jane Doe,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Jane Doe
+sn: Doe
+givenName: Jane
+mail: jane.doe@example.com
+telephoneNumber: +1 415 555 0138
+uid: jdoe
+employeeNumber: EMP-88213
+homePostalAddress: 742 Evergreen Terrace, Springfield, IL 62704
+userPassword: {SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ=
+
+dn: cn=Robert Chen,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Robert Chen
+sn: Chen
+givenName: Robert
+mail: robert.chen@example.com
+telephoneNumber: +1 206 555 0177
+uid: rchen
+employeeNumber: EMP-88214
+homePostalAddress: 90 Pike Street, Seattle, WA 98101
+userPassword: {SSHA}Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA==

@@ -36,10 +36,10 @@ export function replaceAll(text, search, replacement, caseInsensitive = false) {
  * "$1,411.80" produced from "$1,234.56".
  * @param {string} text
  * @param {Array<{type:string, original:string, fakeValue:string, enabled:boolean}>} entries
- * @param {{xmlSafe?: boolean}} opts
+ * @param {{xmlSafe?: boolean, sqlSafe?: boolean}} opts
  */
 export function applyEntriesToText(text, entries, opts = {}) {
-  const { xmlSafe = false } = opts;
+  const { xmlSafe = false, sqlSafe = false } = opts;
   // Longest originals first, so "John Smith" is replaced as a unit before the
   // derived "John"/"Smith" sub-strings get a chance to break it apart.
   const active = entries
@@ -55,16 +55,23 @@ export function applyEntriesToText(text, entries, opts = {}) {
 
   // Alphanumeric boundaries keep a short entry ("Doe", "4250") from rewriting
   // the middle of a longer word or number it merely appears inside.
+  // In a SQL dump a literal apostrophe is written `''`, so "O'Brien" in the
+  // data appears as "O''Brien" in the file. Allow either spelling to match and
+  // escape apostrophes in the fake on the way back in.
+  const patternFor = (original) =>
+    sqlSafe ? escapeRegExp(original).replace(/'/g, "'{1,2}") : escapeRegExp(original);
+
   const re = new RegExp(
     active
-      .map((entry) => `(?<![A-Za-z0-9])(?:${escapeRegExp(entry.original)})(?![A-Za-z0-9])`)
+      .map((entry) => `(?<![A-Za-z0-9])(?:${patternFor(entry.original)})(?![A-Za-z0-9])`)
       .join('|'),
     'gi',
   );
   return text.replace(re, (match) => {
-    const entry = lookup.get(match.toLowerCase());
+    const entry = lookup.get(match.replace(/''/g, "'").toLowerCase()) || lookup.get(match.toLowerCase());
     if (!entry) return match;
-    return xmlSafe ? escapeXml(entry.fakeValue) : entry.fakeValue;
+    if (xmlSafe) return escapeXml(entry.fakeValue);
+    return sqlSafe ? String(entry.fakeValue).replace(/'/g, "''") : entry.fakeValue;
   });
 }
 

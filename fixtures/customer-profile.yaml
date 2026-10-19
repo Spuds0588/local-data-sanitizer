@@ -1,0 +1,20 @@
+# Customer profile — internal use only
+customer:
+  id: CUS-77341
+  full_name: Ingrid Halvorsen
+  email: ingrid.halvorsen@example.no
+  phone: "+47 22 12 34 56"
+  date_of_birth: 1977-09-08
+  national_id: "AB 12 34 56 C"
+  address:
+    line1: "12 Strandgata"
+    city: Bergen
+    postal_code: "5013"
+  vehicle_vin: 1HGCM82633A004352
+  crypto_wallet: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
+  password: "Fjord!2024"
+  api_key: "sk-proj-4d8f2a6c9e1b7d3f5a0c8e2b6d4f1a9c"
+  last_login:
+    ip: 192.0.2.44
+    at: 2024-02-11T08:14:00Z
+  coordinates: "60.3913, 5.3221"

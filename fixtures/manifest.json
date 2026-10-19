@@ -870,6 +870,43 @@
       ]
     },
     {
+      "name": "board-deck.pptx",
+      "secrets": [
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "Diego Marques",
+          "match": "text"
+        },
+        {
+          "value": "diego.marques@contoso.example",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0142",
+          "match": "text"
+        },
+        {
+          "value": "Amara Okafor",
+          "match": "text"
+        },
+        {
+          "value": "amara.okafor@contoso.example",
+          "match": "text"
+        },
+        {
+          "value": "+44 20 7946 0123",
+          "match": "text"
+        },
+        {
+          "value": "(415) 555-0199",
+          "match": "text"
+        }
+      ]
+    },
+    {
       "name": "statement.pdf",
       "secrets": [
         {
@@ -1546,6 +1583,739 @@
         },
         {
           "value": "(617)555-0110",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "insurance-claims.csv",
+      "secrets": [
+        {
+          "value": "CLM-8801",
+          "match": "text"
+        },
+        {
+          "value": "Owen Pritchard",
+          "match": "text"
+        },
+        {
+          "value": "1968-03-12",
+          "match": "text"
+        },
+        {
+          "value": "943 476 5919",
+          "match": "text"
+        },
+        {
+          "value": "+44 20 7946 0958",
+          "match": "text"
+        },
+        {
+          "value": "14 Elm Grove",
+          "match": "text"
+        },
+        {
+          "value": "2450.00",
+          "match": "number"
+        },
+        {
+          "value": "CLM-8802",
+          "match": "text"
+        },
+        {
+          "value": "Mariana Silva",
+          "match": "text"
+        },
+        {
+          "value": "1984-07-21",
+          "match": "text"
+        },
+        {
+          "value": "529.982.247-25",
+          "match": "text"
+        },
+        {
+          "value": "+55 11 91234-5678",
+          "match": "text"
+        },
+        {
+          "value": "Rua das Flores 128",
+          "match": "text"
+        },
+        {
+          "value": "1800.00",
+          "match": "number"
+        },
+        {
+          "value": "CLM-8803",
+          "match": "text"
+        },
+        {
+          "value": "Priyanka Rao",
+          "match": "text"
+        },
+        {
+          "value": "1991-11-05",
+          "match": "text"
+        },
+        {
+          "value": "2341 2341 2346",
+          "match": "text"
+        },
+        {
+          "value": "+91 98765 43210",
+          "match": "text"
+        },
+        {
+          "value": "22 MG Road",
+          "match": "text"
+        },
+        {
+          "value": "3200.00",
+          "match": "number"
+        },
+        {
+          "value": "CLM-8804",
+          "match": "text"
+        },
+        {
+          "value": "Liam Fraser",
+          "match": "text"
+        },
+        {
+          "value": "1979-02-18",
+          "match": "text"
+        },
+        {
+          "value": "046-454-765",
+          "match": "text"
+        },
+        {
+          "value": "123 456 782",
+          "match": "text"
+        },
+        {
+          "value": "+1 (604) 555-0192",
+          "match": "text"
+        },
+        {
+          "value": "900 Robson Street",
+          "match": "text"
+        },
+        {
+          "value": "2750.00",
+          "match": "number"
+        },
+        {
+          "value": "AB 12 34 56 C",
+          "match": "text"
+        },
+        {
+          "value": "M14 5TQ",
+          "match": "text"
+        },
+        {
+          "value": "01310-100",
+          "match": "text"
+        },
+        {
+          "value": "V6Z 1A1",
+          "match": "text"
+        },
+        {
+          "value": "560001",
+          "match": "number"
+        },
+        {
+          "value": "0161 496 0123",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "hr-records.html",
+      "secrets": [
+        {
+          "value": "EMP-9001",
+          "match": "text"
+        },
+        {
+          "value": "Harriet Osei",
+          "match": "text"
+        },
+        {
+          "value": "harriet.osei@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "+1 (312) 555-0148",
+          "match": "text"
+        },
+        {
+          "value": "03/14/1985",
+          "match": "text"
+        },
+        {
+          "value": "487-55-2130",
+          "match": "text"
+        },
+        {
+          "value": "19 Willow Bend, Chicago, IL 60614",
+          "match": "text"
+        },
+        {
+          "value": "96500.00",
+          "match": "number"
+        },
+        {
+          "value": "EMP-9002",
+          "match": "text"
+        },
+        {
+          "value": "Mateo Rivera",
+          "match": "text"
+        },
+        {
+          "value": "mateo.rivera@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0172",
+          "match": "text"
+        },
+        {
+          "value": "11/02/1990",
+          "match": "text"
+        },
+        {
+          "value": "612-44-8890",
+          "match": "text"
+        },
+        {
+          "value": "845 Bay Street, San Francisco, CA 94109",
+          "match": "text"
+        },
+        {
+          "value": "112000.00",
+          "match": "number"
+        },
+        {
+          "value": "EMP-9003",
+          "match": "text"
+        },
+        {
+          "value": "Sofia Lindqvist",
+          "match": "text"
+        },
+        {
+          "value": "sofia.lindqvist@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "+1 (206) 555-0133",
+          "match": "text"
+        },
+        {
+          "value": "07/19/1982",
+          "match": "text"
+        },
+        {
+          "value": "588-23-7741",
+          "match": "text"
+        },
+        {
+          "value": "221 Pine Street, Seattle, WA 98101",
+          "match": "text"
+        },
+        {
+          "value": "104500.00",
+          "match": "number"
+        },
+        {
+          "value": "Yaa Osei",
+          "match": "text"
+        },
+        {
+          "value": "(312) 555-0191",
+          "match": "text"
+        },
+        {
+          "value": "yaa.osei@example.org",
+          "match": "text"
+        },
+        {
+          "value": "hr@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "(312) 555-0100",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "app-config.env",
+      "secrets": [
+        {
+          "value": "postgres://app_user:S3curePassw0rd!@db.internal.northwind.example:5432/orders",
+          "match": "text"
+        },
+        {
+          "value": "redis://cache_user:R3disPass@cache.internal.northwind.example:6379/0",
+          "match": "text"
+        },
+        {
+          "value": "sk_live_51H8xQ2LkdIwHu7ix7QwErTyUiOpAsDfGhJkL",
+          "match": "text"
+        },
+        {
+          "value": "AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY",
+          "match": "text"
+        },
+        {
+          "value": "SG.ABCDEFGHIJKLMNOPQRSTUV.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn",
+          "match": "text"
+        },
+        {
+          "value": "SK0123456789abcdef0123456789abcdef",
+          "match": "text"
+        },
+        {
+          "value": "npm_abcdefghijklmnopqrstuvwxyz0123456789",
+          "match": "text"
+        },
+        {
+          "value": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+          "match": "text"
+        },
+        {
+          "value": "AKIAIOSFODNN7EXAMPLE",
+          "match": "text"
+        },
+        {
+          "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+          "match": "text"
+        },
+        {
+          "value": "ops.admin@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "+44 20 7946 0958",
+          "match": "text"
+        },
+        {
+          "value": "2001:db8:85a3::8a2e:370:7334",
+          "match": "text"
+        },
+        {
+          "value": "00:1B:44:11:3A:B7",
+          "match": "text"
+        },
+        {
+          "value": "51.5074",
+          "match": "text"
+        },
+        {
+          "value": "-0.1278",
+          "match": "text"
+        },
+        {
+          "value": "session=9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c",
+          "match": "text"
+        },
+        {
+          "value": "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "customer-profile.yaml",
+      "secrets": [
+        {
+          "value": "CUS-77341",
+          "match": "text"
+        },
+        {
+          "value": "Ingrid Halvorsen",
+          "match": "text"
+        },
+        {
+          "value": "ingrid.halvorsen@example.no",
+          "match": "text"
+        },
+        {
+          "value": "+47 22 12 34 56",
+          "match": "text"
+        },
+        {
+          "value": "1977-09-08",
+          "match": "text"
+        },
+        {
+          "value": "AB 12 34 56 C",
+          "match": "text"
+        },
+        {
+          "value": "12 Strandgata",
+          "match": "text"
+        },
+        {
+          "value": "Bergen",
+          "match": "text"
+        },
+        {
+          "value": "5013",
+          "match": "number"
+        },
+        {
+          "value": "1HGCM82633A004352",
+          "match": "text"
+        },
+        {
+          "value": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+          "match": "text"
+        },
+        {
+          "value": "Fjord!2024",
+          "match": "text"
+        },
+        {
+          "value": "sk-proj-4d8f2a6c9e1b7d3f5a0c8e2b6d4f1a9c",
+          "match": "text"
+        },
+        {
+          "value": "192.0.2.44",
+          "match": "text"
+        },
+        {
+          "value": "60.3913, 5.3221",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "mail-encoded.eml",
+      "secrets": [
+        {
+          "value": "Zoë Laurent",
+          "match": "text"
+        },
+        {
+          "value": "zoe.laurent@example.fr",
+          "match": "text"
+        },
+        {
+          "value": "020 7946 0958",
+          "match": "text"
+        },
+        {
+          "value": "1982-05-17",
+          "match": "text"
+        },
+        {
+          "value": "Owen Pritchard",
+          "match": "text"
+        },
+        {
+          "value": "owen.pritchard@example.co.uk",
+          "match": "text"
+        },
+        {
+          "value": "Zoë Laurent - statement.pdf",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "crm-export.xml",
+      "secrets": [
+        {
+          "value": "Aisha",
+          "match": "text"
+        },
+        {
+          "value": "Rahman",
+          "match": "text"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "Diego",
+          "match": "text"
+        },
+        {
+          "value": "Marques",
+          "match": "text"
+        },
+        {
+          "value": "O'Brien",
+          "match": "text"
+        },
+        {
+          "value": "Siobhán",
+          "match": "text"
+        },
+        {
+          "value": "aisha.rahman@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "d.marques@contoso.example",
+          "match": "text"
+        },
+        {
+          "value": "siobhan.obrien@example.ie",
+          "match": "text"
+        },
+        {
+          "value": "+44 20 7946 0958",
+          "match": "text"
+        },
+        {
+          "value": "+91 98765 43210",
+          "match": "text"
+        },
+        {
+          "value": "1991-04-17",
+          "match": "text"
+        },
+        {
+          "value": "18 Marsh Lane",
+          "match": "text"
+        },
+        {
+          "value": "Manchester",
+          "match": "text"
+        },
+        {
+          "value": "M14 5TQ",
+          "match": "text"
+        },
+        {
+          "value": "Rua das Flores 128",
+          "match": "text"
+        },
+        {
+          "value": "São Paulo",
+          "match": "text"
+        },
+        {
+          "value": "01310-100",
+          "match": "text"
+        },
+        {
+          "value": "12 Quay Street",
+          "match": "text"
+        },
+        {
+          "value": "Cork",
+          "match": "text"
+        },
+        {
+          "value": "T12 X8Y2",
+          "match": "text"
+        },
+        {
+          "value": "004211889301",
+          "match": "text"
+        },
+        {
+          "value": "2450.00",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "customers-dump.sql",
+      "secrets": [
+        {
+          "value": "Jane",
+          "match": "text"
+        },
+        {
+          "value": "Doe",
+          "match": "text"
+        },
+        {
+          "value": "Seán",
+          "match": "text"
+        },
+        {
+          "value": "O'Brien",
+          "match": "text"
+        },
+        {
+          "value": "Amara",
+          "match": "text"
+        },
+        {
+          "value": "Okafor",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@acme.example",
+          "match": "text"
+        },
+        {
+          "value": "sean.obrien@example.ie",
+          "match": "text"
+        },
+        {
+          "value": "amara.okafor@contoso.example",
+          "match": "text"
+        },
+        {
+          "value": "(415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "+353 1 234 5678",
+          "match": "text"
+        },
+        {
+          "value": "+1 (604) 555-0192",
+          "match": "text"
+        },
+        {
+          "value": "123-45-6789",
+          "match": "text"
+        },
+        {
+          "value": "987-65-4321",
+          "match": "text"
+        },
+        {
+          "value": "555-44-3322",
+          "match": "text"
+        },
+        {
+          "value": "1986-04-17",
+          "match": "text"
+        },
+        {
+          "value": "1979-11-02",
+          "match": "text"
+        },
+        {
+          "value": "1992-08-09",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace",
+          "match": "text"
+        },
+        {
+          "value": "12 Quay Street",
+          "match": "text"
+        },
+        {
+          "value": "900 Robson Street",
+          "match": "text"
+        },
+        {
+          "value": "94110",
+          "match": "text"
+        },
+        {
+          "value": "D02 X285",
+          "match": "text"
+        },
+        {
+          "value": "V6Z 1A1",
+          "match": "text"
+        },
+        {
+          "value": "92500.00",
+          "match": "text"
+        },
+        {
+          "value": "74000.00",
+          "match": "text"
+        },
+        {
+          "value": "68000.00",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "passport-mrz.txt",
+      "secrets": [
+        {
+          "value": "Anna Maria Eriksson",
+          "match": "text"
+        },
+        {
+          "value": "L898902C3",
+          "match": "text"
+        },
+        {
+          "value": "1974-08-12",
+          "match": "text"
+        },
+        {
+          "value": "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<",
+          "match": "text"
+        },
+        {
+          "value": "L898902C36UTO7408122F1204159ZE184226B<<<<<10",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "directory-export.ldif",
+      "secrets": [
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 415 555 0138",
+          "match": "text"
+        },
+        {
+          "value": "EMP-88213",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace, Springfield, IL 62704",
+          "match": "text"
+        },
+        {
+          "value": "{SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ=",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "robert.chen@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 206 555 0177",
+          "match": "text"
+        },
+        {
+          "value": "EMP-88214",
+          "match": "text"
+        },
+        {
+          "value": "90 Pike Street, Seattle, WA 98101",
+          "match": "text"
+        },
+        {
+          "value": "{SSHA}Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA==",
           "match": "text"
         }
       ]

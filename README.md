@@ -22,14 +22,21 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
 
 ## Features
 
-- **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.tsv`, `.json`, `.jsonl`/`.ndjson`,
-  `.pdf`, and the plain-text family (`.txt`, `.md`, `.log`, `.eml`, `.vcf`, `.ics`, `.xml`, `.html`)
-  — 25 MB per file.
-- **Rules engine:** toggle standard detectors — email, phone, SSN, Luhn-checked cards and
-  masked/last-four fragments, EIN tax IDs,  IBANs (MOD-97), ABA routing numbers, bank accounts, dates of birth, street addresses, IPs,
-  passports, driver's licences, medical/insurance IDs (MRN, member, claim, NPI), profile URLs
-  and @handles, SWIFT/BIC codes, passwords, API keys (OpenAI/AWS/GitHub/Slack/JWT/Bearer) and
-  user/transaction IDs — and add your own secret keywords ("Project Phoenix", "Elon Musk", …).
+- **Uploads:** drag & drop `.docx`, `.pptx`, `.xlsx`, `.xls`, `.csv`, `.tsv`, `.json`, `.jsonl`/`.ndjson`,
+  `.pdf`, `.eml`, `.html`/`.htm`, and the plain-text family (`.txt`, `.md`, `.log`, `.vcf`, `.ics`,
+  `.xml`, `.yaml`, `.ini`, `.env`, `.ldif`, `.sql`, `.srt`, `.vtt`) — 25 MB per file.
+- **Rules engine:** toggle standard detectors — email, phone (US and national UK/EU formats),
+  SSN, Luhn-checked cards and masked/last-four fragments, EIN tax IDs, IBANs (MOD-97), ABA
+  routing numbers, UK sort codes / AU BSB / IFSC / CLABE, bank accounts, dates of birth, street
+  addresses, IPv4 and checksum-verified IPv6, MAC addresses, passports and ICAO MRZ blocks
+  (every check digit verified), driver's licences, national IDs with real checksums (UK NI,
+  NHS, Brazilian CPF, Indian Aadhaar, Canadian SIN, Australian TFN), medical/insurance IDs
+  (MRN, member, claim, NPI), profile URLs and @handles, SWIFT/BIC codes, VINs, vehicle plates,
+  crypto wallets, private key blocks (RSA/EC/OpenSSH/PGP), connection strings with passwords,
+  `Cookie:` headers, geo coordinates, UK/CA/BR/IE postcodes, passwords (including `{SSHA}` /
+  bcrypt hashes), API keys (OpenAI/AWS/GitHub/Slack/Stripe/Google/SendGrid/npm/JWT/Bearer and
+  secret env vars) and user/transaction IDs — and add your own secret keywords
+  ("Project Phoenix", "Elon Musk", …).
 - **Context-aware typecasting:** a spreadsheet header (`Account Number`, `Balance`,
   `Full Name`, `Date of Birth`), a JSON key (`account_number`, `balance`, `ssn`), a
   `Label:` line, a Markdown pipe table or a vCard/iCalendar property tells the sanitizer
@@ -38,10 +45,13 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
   `Payee` are no longer invisible, and the same value is replaced the same way in every
   uploaded file.
 - **Structure-aware text formats:** Markdown headings, bold labels and tables, email
-  headers/display names/signatures, `key=value` log fields, vCard `N`/`FN`/`ADR`/`BDAY`/`URL`
-  and iCalendar `ORGANIZER`/`ATTENDEE`/`LOCATION` are read as structure. Values split over
-  an iCalendar/vCard fold are rejoined, replaced and folded back to 75 characters, so the
-  calendar still parses and nothing is reflowed.
+  headers/display names/signatures, `key=value` and LDIF/`Label:` fields, vCard
+  `N`/`FN`/`ADR`/`BDAY`/`URL`, iCalendar `ORGANIZER`/`ATTENDEE`/`LOCATION`, XML element and
+  attribute names, and SQL `CREATE TABLE`/`INSERT` column order are read as structure — a
+  bare `Aisha` in `<FirstName>` or a mysqldump tuple with no column list is typed from its
+  field name. Values split over an iCalendar/vCard fold are rejoined, replaced and folded back
+  to 75 characters, so the calendar still parses and nothing is reflowed. SQL literals keep
+  their quoting and `''` escaping; XML fakes are entity-escaped so the document stays valid.
 - **People vs companies:** a `Payee`/`Customer` column is typed as a person or an
   organisation from the value itself (`Whole Foods Market`, `City Power & Light`, `… LLC`),
   so exports keep reading as invoices instead of a list of people. Column headers are never
@@ -67,7 +77,9 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
   replacement before exporting.
 - **Reusable profiles:** export your rules to `rules.json` and import them later.
 - **Local download:** sanitized files are generated as blobs and downloaded; PDFs export as
-  `.txt` (V1 does not preserve PDF visual layout), DOCX/XLSX keep their structure.
+  `.txt` (V1 does not preserve PDF visual layout), DOCX/PPTX/XLSX keep their structure (slide
+  titles, tables and speaker notes included), and
+  EML/Markdown/XML/SQL/LDIF/vCard/iCalendar round-trip byte-for-byte except for the values.
 
 ## Stack
 
@@ -96,6 +108,7 @@ npm run build           # static output in dist/
 | `accounts-receivable.xlsx` | invoices + customers sheets | names, emails, phones, EINs, IBANs, addresses, DOBs, SSNs, accounts, formatted money |
 | `user-export.json` | nested user export | numeric + string accounts, nested address, IPs, passwords, API keys, money-keyed numbers |
 | `kyc-profile.docx` | labelled paragraphs + beneficiary table | names, passport, licence, DOB, address, income, table cells |
+| `board-deck.pptx` | 1-slide hiring deck | Title-placeholder name (reused in speaker notes), table of names/emails/phones, untouched theme and parts |
 | `statement.pdf` | text-layer statement | holder, account, address, transaction counterparties, balances, masked card |
 | `support-tickets.csv` | free-text inbox | PII inside sentences, labels, API keys, UTF-8 punctuation |
 | `payroll-register.tsv` | 14-column HR/payroll export | split first/last names, bare + dashed SSNs, month-name/ISO DOBs, bank accounts, salaries, phones in notes |
@@ -105,6 +118,15 @@ npm run build           # static output in dist/
 | `team-calendar.ics` | folded iCalendar invite | organiser/attendee display names, location address, PII in a folded DESCRIPTION |
 | `patient-notes.md` | Markdown clinical note | bold label lines, heading name, pipe table, medical record/member IDs, payer, prose name reuse |
 | `access.log` | 6-line application log | IPs, `user_id=`, emails, bearer token, amounts, phone — with timestamps and status codes intact |
+| `insurance-claims.csv` | international claims grid | UK/BR/IN/CA/AU national IDs, UK/BR/IN/IE postcodes, international phone formats |
+| `hr-records.html` | HTML report with two tables | typed `<thead>` columns, label/value rows, `mailto:` links, markup preserved |
+| `app-config.env` | 12-factor env file | API keys, database DSN with a password, JWT, AWS secret, SMTP credentials |
+| `customer-profile.yaml` | nested YAML profile | nested contact/address, DOB, IBAN, API keys, integer and quoted values |
+| `mail-encoded.eml` | quoted-printable + base64 mail | RFC 2047 encoded display name, QP and base64 bodies, attachment filename and bytes |
+| `crm-export.xml` | namespaced CRM/SOAP export | element- and attribute-typed fields, multi-line address, amount, owner name |
+| `customers-dump.sql` | mysqldump output | column-less `INSERT … VALUES`, quoted `''` apostrophes, SSNs, Eircode, decimals |
+| `passport-mrz.txt` | KYC dossier with a passport MRZ | two 44-character MRZ lines with every check digit, plus labelled prose fields |
+| `directory-export.ldif` | LDAP directory dump | `cn`/`sn`/`givenName`, mail, phone, employee numbers, postal address, `{SSHA}` hashes |
 
 `fixtures/manifest.json` lists every synthetic value that must not survive, with a text or
 numeric matcher. `src/lib/__tests__/fixtures.test.js` scans the whole corpus together
@@ -143,8 +165,9 @@ manifest in sync; replacements themselves are random per run.
 - PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
 - DOCX replacement edits `word/document.xml`, header, footer, note and comment text nodes;
   PII split across multiple Word runs may not be caught.
-- `.eml` bodies are handled as 8-bit text: a quoted-printable or base64 part is not decoded,
-  so PII encoded as `=40`-style escapes would not match. Attachments are left as-is.
+- `.eml` bodies are decoded (quoted-printable, base64, RFC 2047 words), scrubbed and
+  re-encoded in the same encoding, but attachments are left untouched: PII inside an attached
+  PDF or spreadsheet is not reached unless that attachment is uploaded separately.
 - Advanced cell styling beyond number formats is not fully preserved by SheetJS.
 - The jiggler reads US-style amounts only (`1,234.56`, not `1.234,56`), treats bare integers as
   money only when a header/key says they are, and does not recompute totals or subtotals

@@ -6,6 +6,9 @@ import * as xlsxParser from '../parsers/xlsxParser.js';
 import * as docxParser from '../parsers/docxParser.js';
 import * as textParser from '../parsers/textParser.js';
 import * as jsonlParser from '../parsers/jsonlParser.js';
+import * as htmlParser from '../parsers/htmlParser.js';
+import * as emlParser from '../parsers/emlParser.js';
+import * as pptxParser from '../parsers/pptxParser.js';
 import { analyzeFiles, sanitizeFiles } from '../engine.js';
 import { DEFAULT_CONFIG } from '../rules.js';
 
@@ -308,6 +311,237 @@ describe('jsonlParser', () => {
     const text = '{"user":"Jane Doe"}\n{"user":"Robert Chen"}\n';
     const segments = await jsonlParser.detect(new File([text], 'u.jsonl'));
     expect(segments).toEqual(expect.arrayContaining(['Jane Doe', 'Robert Chen']));
+  });
+});
+
+describe('htmlParser', () => {
+  const html = `<!doctype html><html><body>
+    <h1>Team</h1>
+    <table><thead><tr><th>Full Name</th><th>Email</th></tr></thead>
+      <tbody>
+        <tr><td>Jane Doe</td><td>jane@acme.example</td></tr>
+        <tr><td>Robert Chen</td><td>robert@acme.example</td></tr>
+      </tbody></table>
+    <p>Questions: <a href="mailto:jane@acme.example">jane@acme.example</a></p>
+  </body></html>`;
+
+  it('types cells from a header row', async () => {
+    const { typedValues, segments } = await htmlParser.detectWithMeta(
+      new File([html], 'team.html', { type: 'text/html' }),
+    );
+    expect(typedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ original: 'Jane Doe', type: 'name' }),
+        expect.objectContaining({ original: 'robert@acme.example', type: 'email' }),
+      ]),
+    );
+    expect(segments).toContain('jane@acme.example');
+  });
+
+  it('rewrites visible text and attribute values but keeps the markup', async () => {
+    const { blob } = await htmlParser.sanitize(
+      new File([html], 'team.html', { type: 'text/html' }),
+      [
+        { type: 'name', original: 'Jane Doe', fakeValue: 'Nora Quinn', enabled: true },
+        { type: 'email', original: 'jane@acme.example', fakeValue: 'nora@example.test', enabled: true },
+      ],
+    );
+    const out = await blob.text();
+    expect(out).toContain('<table>');
+    expect(out).toContain('<th>Full Name</th>');
+    expect(out).toContain('<td>Robert Chen</td>');
+    expect(out).toContain('<td>Nora Quinn</td>');
+    expect(out).toContain('<a href="mailto:nora@example.test">nora@example.test</a>');
+    expect(out).not.toContain('jane@acme.example');
+  });
+});
+
+describe('emlParser', () => {
+  const attachment = 'FAKE-PDF-BYTES-0123456789';
+  const htmlPart = '<p>jane@acme.example</p>';
+  const message = [
+    'From: "Jane Doe" <jane@acme.example>',
+    'To: ops@acme.example',
+    'Subject: statement',
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="b1"',
+    '',
+    '--b1',
+    'Content-Type: text/plain; charset="utf-8"',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    'Hi, mail jane@acme.example or call 020 7946 0958.',
+    '--b1',
+    'Content-Type: text/html; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(htmlPart).toString('base64'),
+    '--b1',
+    'Content-Type: application/pdf; name="jane@acme.example.pdf"',
+    'Content-Disposition: attachment; filename="jane@acme.example.pdf"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(attachment).toString('base64'),
+    '--b1--',
+    '',
+  ].join('\r\n');
+
+  const entries = [
+    { type: 'name', original: 'Jane Doe', fakeValue: 'Nora Quinn', enabled: true },
+    { type: 'email', original: 'jane@acme.example', fakeValue: 'nora@example.test', enabled: true },
+    { type: 'phone', original: '020 7946 0958', fakeValue: '020 7946 0999', enabled: true },
+  ];
+
+  it('decodes quoted-printable and base64 before typing, and keeps the attachment bytes', async () => {
+    const segments = await emlParser.detect(new File([message], 'mail.eml', { type: 'message/rfc822' }));
+    expect(segments.join('\n')).toContain('jane@acme.example');
+    expect(segments.join('\n')).toContain(htmlPart);
+    expect(segments.join('\n')).not.toContain(attachment);
+
+    const { blob } = await emlParser.sanitize(
+      new File([message], 'mail.eml', { type: 'message/rfc822' }),
+      entries,
+    );
+    const out = await blob.text();
+    expect(out).not.toContain('jane@acme.example');
+    expect(out).not.toContain('020 7946 0958');
+    expect(out).toContain('nora@example.test');
+    expect(out).toContain('Nora Quinn');
+    // Multipart structure survives: boundary, encodings, decoded HTML part.
+    expect(out).toContain('boundary="b1"');
+    expect(out).toContain('Content-Transfer-Encoding: base64');
+    expect(out).toContain(Buffer.from('<p>nora@example.test</p>').toString('base64'));
+    // The attachment is left byte-for-byte alone, including its filename header
+    // except for the scrubbed filename value.
+    expect(out).toContain(Buffer.from(attachment).toString('base64'));
+    expect(out).toContain('filename="nora@example.test.pdf"');
+    expect(out.endsWith('--b1--\r\n')).toBe(true);
+  });
+});
+
+describe('pptxParser', () => {
+  async function deck() {
+    const zip = new JSZip();
+    zip.file(
+      'ppt/slides/slide1.xml',
+      '<?xml version="1.0"?><p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree>' +
+        '<p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>' +
+        '<p:txBody><a:p><a:r><a:t>Priya Natarajan</a:t></a:r></a:p></p:txBody></p:sp>' +
+        '<a:tbl><a:tr><a:tc><a:t>Full Name</a:t></a:tc><a:tc><a:t>Email</a:t></a:tc></a:tr>' +
+        '<a:tr><a:tc><a:t>Robert Chen</a:t></a:tc><a:tc><a:t>robert@acme.example</a:t></a:tc></a:tr></a:tbl>' +
+        '</p:spTree></p:cSld></p:sld>',
+    );
+    zip.file(
+      'ppt/notesSlides/notesSlide1.xml',
+      '<p:notes xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Call 020 7946 0958</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>',
+    );
+    return new File([await zip.generateAsync({ type: 'nodebuffer' })], 'deck.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+  }
+
+  it('types the title placeholder and table cells', async () => {
+    const { typedValues, segments } = await pptxParser.detectWithMeta(await deck());
+    expect(typedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ original: 'Priya Natarajan', type: 'name' }),
+        expect.objectContaining({ original: 'robert@acme.example', type: 'email' }),
+      ]),
+    );
+    // Speaker notes are read too.
+    expect(segments.join('\n')).toContain('020 7946 0958');
+  });
+
+  it('rewrites text runs and keeps the package structure', async () => {
+    const file = await deck();
+    const { blob, name } = await pptxParser.sanitize(file, [
+      { type: 'name', original: 'Priya Natarajan', fakeValue: 'Nora Quinn', enabled: true },
+      { type: 'name', original: 'Robert Chen', fakeValue: 'Miles Avery', enabled: true },
+      { type: 'email', original: 'robert@acme.example', fakeValue: 'miles@example.test', enabled: true },
+      { type: 'phone', original: '020 7946 0958', fakeValue: '020 7946 0999', enabled: true },
+    ]);
+    expect(name).toBe('deck.sanitized.pptx');
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const slide = await zip.file('ppt/slides/slide1.xml').async('string');
+    expect(slide).toContain('<a:t>Nora Quinn</a:t>');
+    expect(slide).toContain('<a:t>Miles Avery</a:t>');
+    expect(slide).toContain('<a:t>Full Name</a:t>');
+    expect(slide).not.toContain('robert@acme.example');
+    expect(slide).toContain('<p:ph type="title"/>');
+    const notes = await zip.file('ppt/notesSlides/notesSlide1.xml').async('string');
+    expect(notes).toContain('020 7946 0999');
+    expect(notes).not.toContain('020 7946 0958');
+  });
+});
+
+describe('textParser XML and SQL typing', () => {
+  const xml = `<?xml version="1.0"?>
+<Export><Customer id="CUS-88213">
+  <FirstName>Aisha</FirstName>
+  <Company>Acme &amp; Sons</Company>
+  <Address line1="18 Marsh Lane" city="Manchester"/>
+  <Note>Acme &amp; Sons called</Note>
+</Customer></Export>`;
+
+  it('types XML elements and attributes from their names', async () => {
+    const { typedValues } = await textParser.detectWithMeta(new File([xml], 'export.xml'));
+    expect(typedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ original: 'Aisha', type: 'name' }),
+        expect.objectContaining({ original: '18 Marsh Lane', type: 'address' }),
+        expect.objectContaining({ original: 'Manchester', type: 'city' }),
+      ]),
+    );
+  });
+
+  it('keeps XML markup intact and escapes the fake value', async () => {
+    const { blob } = await textParser.sanitize(new File([xml], 'export.xml'), [
+      { type: 'name', original: 'Aisha', fakeValue: 'Nora', enabled: true },
+      { type: 'organization', original: 'Acme &amp; Sons', fakeValue: 'Bell & Co', enabled: true },
+    ]);
+    const out = await blob.text();
+    expect(out).toContain('<FirstName>Nora</FirstName>');
+    expect(out).toContain('<Address line1="18 Marsh Lane" city="Manchester"/>');
+    expect(out).not.toContain('Aisha');
+    // The raw `&` in the fake is escaped so the document still parses.
+    expect(out).toContain('Bell &amp; Co called');
+    expect(out).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#)/);
+  });
+
+  const sql = [
+    'CREATE TABLE `customers` (',
+    '  `customer_id` int NOT NULL,',
+    '  `first_name` varchar(40) DEFAULT NULL,',
+    '  `last_name` varchar(40) DEFAULT NULL,',
+    '  `email` varchar(80) DEFAULT NULL,',
+    '  `annual_salary` decimal(10,2) DEFAULT NULL,',
+    '  PRIMARY KEY (`customer_id`)',
+    ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
+    "INSERT INTO `customers` VALUES (1,'Dara','O''Brien','dara@example.ie',92500.00);",
+  ].join('\n');
+
+  it('takes column order from CREATE TABLE when INSERT omits the list', async () => {
+    const { typedValues } = await textParser.detectWithMeta(new File([sql], 'dump.sql'));
+    expect(typedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ original: 'Dara', type: 'name' }),
+        expect.objectContaining({ original: "O'Brien", type: 'name' }),
+        expect.objectContaining({ original: 'dara@example.ie', type: 'email' }),
+        expect.objectContaining({ original: '92500.00', type: 'amount' }),
+      ]),
+    );
+  });
+
+  it('re-escapes apostrophes in SQL literals', async () => {
+    const { blob } = await textParser.sanitize(new File([sql], 'dump.sql'), [
+      { type: 'name', original: "O'Brien", fakeValue: "Nora O'Neil", enabled: true },
+      { type: 'email', original: 'dara@example.ie', fakeValue: 'nora@example.test', enabled: true },
+    ]);
+    const out = await blob.text();
+    expect(out).toContain("'Nora O''Neil'");
+    expect(out).toContain("'nora@example.test'");
+    expect(out).not.toContain("O''Brien");
+    expect(out).toContain('CREATE TABLE `customers` (');
   });
 });
 

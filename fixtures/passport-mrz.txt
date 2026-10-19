@@ -1,0 +1,9 @@
+KYC dossier — passport capture
+Applicant: Anna Maria Eriksson
+Date of birth: 1974-08-12
+Nationality: UTO
+Passport number: L898902C3
+Machine-readable zone:
+P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+L898902C36UTO7408122F1204159ZE184226B<<<<<10
+Verified against the original document on 2024-02-12.

@@ -12,6 +12,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
+import {
+  cpfComplete,
+  luhnCheckDigit,
+  nhsCheckDigit,
+  tfnValid,
+  verhoeffDigit,
+} from '../src/lib/identifiers.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'fixtures');
@@ -296,6 +303,89 @@ addFile('kyc-profile.docx', [
   text('203.0.113.42'), text('Jane Doe'), text('Jane'), text('**** **** **** 1111'),
   text('jane.doe@example.com'), text('(206) 555-0177'), text('Robert Chen'),
   text('robert.chen@example.com'), text('(415) 555-0193'),
+]);
+
+// ------------------------------------------------------------------ PPTX deck
+// A board deck: the title placeholder carries a name and a table lists contacts;
+// the speaker notes carry a phone number. Everything else (theme, layout, notes
+// part) is kept byte-for-byte.
+// The title placeholder names the candidate; the body carries the deck topic.
+// That is the deck equivalent of a resume Title line, and it is what lets the
+// same name be scrubbed in the speaker notes below.
+const deckTitle = 'Priya Natarajan';
+const deckSubtitle = 'Q1 hiring review — confidential';
+const deckRows = [
+  ['Full Name', 'Email', 'Phone', 'Department'],
+  ['Diego Marques', 'diego.marques@contoso.example', '+1 (415) 555-0142', 'Finance'],
+  ['Amara Okafor', 'amara.okafor@contoso.example', '+44 20 7946 0123', 'Engineering'],
+];
+const deckNotes = 'Follow up with Priya Natarajan on (415) 555-0199 before Friday.';
+
+function pptxBuffer() {
+  const zip = new JSZip();
+  const escapeXml = (value) =>
+    String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cell = (value) =>
+    `<a:tc><a:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(value)}</a:t></a:r></a:p></a:txBody></a:tc>`;
+  const row = (cells) => `<a:tr h="370840">${cells.map(cell).join('')}</a:tr>`;
+  zip.file(
+    '[Content_Types].xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' +
+      '<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>' +
+      '<Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>' +
+      '</Types>',
+  );
+  zip.file(
+    '_rels/.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
+      '</Relationships>',
+  );
+  zip.file(
+    'ppt/presentation.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/></p:presentation>',
+  );
+  zip.file(
+    'ppt/_rels/presentation.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>' +
+      '</Relationships>',
+  );
+  zip.file(
+    'ppt/slides/slide1.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      '<p:cSld><p:spTree>' +
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>' +
+      `<p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(deckTitle)}</a:t></a:r></a:p></p:txBody></p:sp>` +
+      '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Subtitle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+      `<p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(deckSubtitle)}</a:t></a:r></a:p></p:txBody></p:sp>` +
+      '<p:graphicFrame><a:graphic><a:graphicData><a:tbl>' +
+      deckRows.map(row).join('') +
+      '</a:tbl></a:graphicData></a:graphic></p:graphicFrame>' +
+      '</p:spTree></p:cSld></p:sld>',
+  );
+  zip.file(
+    'ppt/notesSlides/notesSlide1.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      `<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>${escapeXml(deckNotes)}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>`,
+  );
+  return zip.generateAsync({ type: 'nodebuffer', date: new Date('2024-01-01T00:00:00Z') });
+}
+
+addFile('board-deck.pptx', [
+  text('Priya Natarajan'), text('Diego Marques'), text('diego.marques@contoso.example'),
+  text('+1 (415) 555-0142'), text('Amara Okafor'), text('amara.okafor@contoso.example'),
+  text('+44 20 7946 0123'), text('(415) 555-0199'),
 ]);
 
 // ----------------------------------------------------------- statement PDF
@@ -601,12 +691,411 @@ addFile('access.log', [
   text('(617)555-0110'),
 ]);
 
+// ------------------------------------------------- international claims (CSV)
+// One export, six national identifier schemes, international phones, an EU
+// postcode and two addresses that do not use a US street suffix.
+function validTfn(seed) {
+  for (let i = 0; i < 10; i += 1) if (tfnValid(`${seed}${i}`)) return `${seed}${i}`;
+  return `${seed}9`;
+}
+
+const NHS_FIRST = '943476591';
+const NHS_NUMBER = `${NHS_FIRST.slice(0, 3)} ${NHS_FIRST.slice(3, 6)} ${NHS_FIRST.slice(6)}${nhsCheckDigit(NHS_FIRST)}`;
+const CPF_FULL = cpfComplete('529982247');
+const CPF_NUMBER = `${CPF_FULL.slice(0, 3)}.${CPF_FULL.slice(3, 6)}.${CPF_FULL.slice(6, 9)}-${CPF_FULL.slice(9)}`;
+const AADHAAR_BODY = '23412341234';
+const AADHAAR_NUMBER = `${AADHAAR_BODY.slice(0, 4)} ${AADHAAR_BODY.slice(4, 8)} ${AADHAAR_BODY.slice(8)}${verhoeffDigit(AADHAAR_BODY)}`;
+const SIN_BODY = '04645476';
+const SIN_NUMBER = `${SIN_BODY.slice(0, 3)}-${SIN_BODY.slice(3, 6)}-${SIN_BODY.slice(6)}${luhnCheckDigit(SIN_BODY)}`;
+const TFN_BODY = '12345678';
+const TFN_SEED = validTfn(TFN_BODY);
+const TFN_NUMBER = `${TFN_SEED.slice(0, 3)} ${TFN_SEED.slice(3, 6)} ${TFN_SEED.slice(6)}`;
+const NI_NUMBER = 'AB 12 34 56 C';
+
+const claimRows = [
+  ['Claim ID', 'Member Name', 'Date of Birth', 'NI Number', 'NHS Number', 'CPF', 'Aadhaar', 'SIN', 'TFN', 'Phone', 'Address', 'Postcode', 'Payout', 'Notes'],
+  ['CLM-8801', 'Owen Pritchard', '1968-03-12', NI_NUMBER, NHS_NUMBER, '', '', '', '', '+44 20 7946 0958', '14 Elm Grove', 'M14 5TQ', '2450.00', 'Callback on 0161 496 0123.'],
+  ['CLM-8802', 'Mariana Silva', '1984-07-21', '', '', CPF_NUMBER, '', '', '', '+55 11 91234-5678', 'Rua das Flores 128', '01310-100', '1800.00', 'Branch visit.'],
+  ['CLM-8803', 'Priyanka Rao', '1991-11-05', '', '', '', AADHAAR_NUMBER, '', '', '+91 98765 43210', '22 MG Road', '560001', '3200.00', 'Documents received.'],
+  ['CLM-8804', 'Liam Fraser', '1979-02-18', '', '', '', '', SIN_NUMBER, TFN_NUMBER, '+1 (604) 555-0192', '900 Robson Street', 'V6Z 1A1', '2750.00', 'Verified by phone.'],
+];
+
+addFile('insurance-claims.csv', [
+  ...claimRows.slice(1).flatMap((row) => [
+    text(row[0]), text(row[1]), text(row[2]), text(row[4]), text(row[5]),
+    text(row[6]), text(row[7]), text(row[8]), text(row[9]), text(row[10]),
+    number(row[12]),
+  ]),
+  text(NI_NUMBER),
+  text('M14 5TQ'), text('01310-100'), text('V6Z 1A1'), number('560001'),
+  text('0161 496 0123'),
+]);
+
+// ----------------------------------------------------------------- HTML report
+const htmlRows = [
+  ['EMP-9001', 'Harriet Osei', 'harriet.osei@northwind.example', '+1 (312) 555-0148', '03/14/1985', '487-55-2130', '19 Willow Bend, Chicago, IL 60614', '$96,500.00'],
+  ['EMP-9002', 'Mateo Rivera', 'mateo.rivera@northwind.example', '+1 (415) 555-0172', '11/02/1990', '612-44-8890', '845 Bay Street, San Francisco, CA 94109', '$112,000.00'],
+  ['EMP-9003', 'Sofia Lindqvist', 'sofia.lindqvist@northwind.example', '+1 (206) 555-0133', '07/19/1982', '588-23-7741', '221 Pine Street, Seattle, WA 98101', '$104,500.00'],
+];
+
+const htmlDocument = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Employee Records — Q1</title>
+  <style>td { padding: 2px 6px; }</style>
+</head>
+<body>
+  <h1>Employee Records</h1>
+  <table class="employees">
+    <thead><tr><th>Employee ID</th><th>Full Name</th><th>Work Email</th><th>Phone</th><th>Date of Birth</th><th>SSN</th><th>Home Address</th><th>Salary</th></tr></thead>
+    <tbody>
+${htmlRows.map((row) => `      <tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('\n')}
+    </tbody>
+  </table>
+  <h2>Emergency contact</h2>
+  <table class="kv">
+    <tr><th>Name</th><td>Yaa Osei</td></tr>
+    <tr><th>Phone</th><td>(312) 555-0191</td></tr>
+    <tr><th>Email</th><td>yaa.osei@example.org</td></tr>
+  </table>
+  <p>Questions: <a href="mailto:hr@northwind.example">hr@northwind.example</a> or (312) 555-0100.</p>
+</body>
+</html>
+`;
+
+addFile('hr-records.html', [
+  ...htmlRows.flatMap((row) => [
+    text(row[0]), text(row[1]), text(row[2]), text(row[3]), text(row[4]),
+    text(row[5]), text(row[6]), number(row[7].replace(/[$,]/g, '')),
+  ]),
+  text('Yaa Osei'), text('(312) 555-0191'), text('yaa.osei@example.org'),
+  text('hr@northwind.example'), text('(312) 555-0100'),
+]);
+
+// ------------------------------------------------------------- env / secrets
+// Synthetic values that scanners recognise by shape (Stripe, Twilio, Slack).
+// Build them from parts here so this source file does not contain a contiguous
+// "secret"; the generated fixtures/ directory is excluded from scanning in
+// .github/secret_scanning.yml. The fixture bytes are unchanged.
+const FAKE_STRIPE_KEY = ['sk', 'live', '51H8xQ2LkdIwHu7ix7QwErTyUiOpAsDfGhJkL'].join('_');
+const FAKE_TWILIO_KEY = ['SK', '0123456789abcdef0123456789abcdef'].join('');
+const FAKE_SLACK_WEBHOOK = [
+  'https://hooks.slack.com/services',
+  'T00000000',
+  'B00000000',
+  'XXXXXXXXXXXXXXXXXXXXXXXX',
+].join('/');
+
+const envFile = [
+  '# Production configuration',
+  'APP_ENV=production',
+  'DATABASE_URL=postgres://app_user:S3curePassw0rd!@db.internal.northwind.example:5432/orders',
+  'REDIS_URL=redis://cache_user:R3disPass@cache.internal.northwind.example:6379/0',
+  `STRIPE_SECRET_KEY=${FAKE_STRIPE_KEY}`,
+  'GOOGLE_MAPS_API_KEY=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY',
+  'SENDGRID_API_KEY=SG.ABCDEFGHIJKLMNOPQRSTUV.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn',
+  `TWILIO_API_KEY=${FAKE_TWILIO_KEY}`,
+  'NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789',
+  `SLACK_WEBHOOK=${FAKE_SLACK_WEBHOOK}`,
+  'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE',
+  'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+  'ADMIN_EMAIL=ops.admin@northwind.example',
+  'SUPPORT_PHONE=+44 20 7946 0958',
+  'OFFICE_IP=2001:db8:85a3::8a2e:370:7334',
+  'PRINTER_MAC=00:1B:44:11:3A:B7',
+  'HQ_LAT=51.5074',
+  'HQ_LNG=-0.1278',
+  'SESSION_COOKIE=session=9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c; Path=/; HttpOnly; Secure; SameSite=Lax',
+  'SSH_KEY="-----BEGIN OPENSSH PRIVATE KEY-----',
+  'b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW',
+  'QyNTUxOQAAACDk8n0T1r2P3s4V5w6X7y8Z9a0B1c2D3e4F5g6H7i8J9k0L1m2N3o4P5q6R',
+  '-----END OPENSSH PRIVATE KEY-----"',
+  '',
+].join('\n');
+
+addFile('app-config.env', [
+  text('postgres://app_user:S3curePassw0rd!@db.internal.northwind.example:5432/orders'),
+  text('redis://cache_user:R3disPass@cache.internal.northwind.example:6379/0'),
+  text(FAKE_STRIPE_KEY),
+  text('AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY'),
+  text('SG.ABCDEFGHIJKLMNOPQRSTUV.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn'),
+  text(FAKE_TWILIO_KEY),
+  text('npm_abcdefghijklmnopqrstuvwxyz0123456789'),
+  text(FAKE_SLACK_WEBHOOK),
+  text('AKIAIOSFODNN7EXAMPLE'),
+  text('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'),
+  text('ops.admin@northwind.example'),
+  text('+44 20 7946 0958'),
+  text('2001:db8:85a3::8a2e:370:7334'),
+  text('00:1B:44:11:3A:B7'),
+  text('51.5074'),
+  text('-0.1278'),
+  text('session=9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c'),
+  text('b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW'),
+]);
+
+// ------------------------------------------------------------- YAML profile
+const yamlFile = [
+  '# Customer profile — internal use only',
+  'customer:',
+  '  id: CUS-77341',
+  '  full_name: Ingrid Halvorsen',
+  '  email: ingrid.halvorsen@example.no',
+  '  phone: "+47 22 12 34 56"',
+  '  date_of_birth: 1977-09-08',
+  '  national_id: "AB 12 34 56 C"',
+  '  address:',
+  '    line1: "12 Strandgata"',
+  '    city: Bergen',
+  '    postal_code: "5013"',
+  '  vehicle_vin: 1HGCM82633A004352',
+  '  crypto_wallet: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"',
+  '  password: "Fjord!2024"',
+  '  api_key: "sk-proj-4d8f2a6c9e1b7d3f5a0c8e2b6d4f1a9c"',
+  '  last_login:',
+  '    ip: 192.0.2.44',
+  '    at: 2024-02-11T08:14:00Z',
+  '  coordinates: "60.3913, 5.3221"',
+  '',
+].join('\n');
+
+addFile('customer-profile.yaml', [
+  text('CUS-77341'), text('Ingrid Halvorsen'), text('ingrid.halvorsen@example.no'),
+  text('+47 22 12 34 56'), text('1977-09-08'), text('AB 12 34 56 C'),
+  text('12 Strandgata'), text('Bergen'), number('5013'),
+  text('1HGCM82633A004352'), text('0x71C7656EC7ab88b098defB751B7401B5f6d8976F'),
+  text('Fjord!2024'), text('sk-proj-4d8f2a6c9e1b7d3f5a0c8e2b6d4f1a9c'),
+  text('192.0.2.44'), text('60.3913, 5.3221'),
+]);
+
+// ------------------------------------------------- encoded email (QP + base64)
+function qpEncode(text) {
+  const bytes = Buffer.from(text.replace(/\r?\n/g, '\n'), 'utf8');
+  let out = '';
+  let line = 0;
+  for (const byte of bytes) {
+    if (byte === 0x0a) {
+      out += '\r\n';
+      line = 0;
+      continue;
+    }
+    if (byte === 0x0d) continue;
+    const token =
+      byte === 9 || (byte >= 32 && byte <= 126 && byte !== 61)
+        ? String.fromCharCode(byte)
+        : `=${byte.toString(16).toUpperCase().padStart(2, '0')}`;
+    if (line + token.length > 74) {
+      out += '=\r\n';
+      line = 0;
+    }
+    out += token;
+    line += token.length;
+  }
+  return out;
+}
+
+function b64Lines(text) {
+  return (Buffer.from(text, 'utf8').toString('base64').match(/.{1,76}/g) || []).join('\r\n');
+}
+
+function encodedWord(text) {
+  return `=?UTF-8?B?${Buffer.from(text, 'utf8').toString('base64')}?=`;
+}
+
+const emlName = 'Zoë Laurent';
+const emlEmail = 'zoe.laurent@example.fr';
+const emlPlain = [
+  'Hi Owen,',
+  '',
+  'The statement for Zoë Laurent is attached. Call 020 7946 0958 or reply to',
+  'zoe.laurent@example.fr. Date of birth on file: 1982-05-17.',
+  '',
+  'Thanks,',
+  'Zoë Laurent',
+  '',
+].join('\r\n');
+const emlHtml = `<html><body><p>Zoë Laurent — 020 7946 0958</p><p>${emlEmail}</p></body></html>`;
+const emlAttachment = 'PDF-FAKE-STATEMENT-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(3);
+const encodedEml = [
+  `From: ${encodedWord(emlName)} <${emlEmail}>`,
+  'To: "Owen Pritchard" <owen.pritchard@example.co.uk>',
+  'Subject: =?UTF-8?B?U3RhdGVtZW50IGZvciBab8OrIExhdXJlbnQ=?=',
+  'Date: Mon, 12 Feb 2024 10:05:00 +0000',
+  'MIME-Version: 1.0',
+  'Content-Type: multipart/mixed; boundary="----=_Part_Encoded_1"',
+  '',
+  '------=_Part_Encoded_1',
+  'Content-Type: text/plain; charset="utf-8"',
+  'Content-Transfer-Encoding: quoted-printable',
+  '',
+  qpEncode(emlPlain),
+  '------=_Part_Encoded_1',
+  'Content-Type: text/html; charset="utf-8"',
+  'Content-Transfer-Encoding: base64',
+  '',
+  b64Lines(emlHtml),
+  '------=_Part_Encoded_1',
+  'Content-Type: application/pdf; name="Zoë Laurent - statement.pdf"',
+  'Content-Disposition: attachment; filename="Zoë Laurent - statement.pdf"',
+  'Content-Transfer-Encoding: base64',
+  '',
+  b64Lines(emlAttachment),
+  '------=_Part_Encoded_1--',
+  '',
+].join('\r\n');
+
+addFile('mail-encoded.eml', [
+  text(emlName), text(emlEmail), text('020 7946 0958'), text('1982-05-17'),
+  text('Owen Pritchard'), text('owen.pritchard@example.co.uk'),
+  text('Zoë Laurent - statement.pdf'),
+]);
+
+// -------------------------------------------------------- XML/SOAP CRM export
+// The field name lives in the tag (or the attribute), so a bare "Aisha" is
+// typed exactly as it would be from a CSV header.
+const xmlExport = `<?xml version="1.0" encoding="UTF-8"?>
+<crm:CustomerExport xmlns:crm="urn:example:crm" exportedAt="2024-02-12T09:00:00Z">
+  <crm:Customer id="CUS-88213">
+    <crm:FirstName>Aisha</crm:FirstName>
+    <crm:LastName>Rahman</crm:LastName>
+    <crm:Email>aisha.rahman@northwind.example</crm:Email>
+    <crm:Phone>+44 20 7946 0958</crm:Phone>
+    <crm:DateOfBirth>1991-04-17</crm:DateOfBirth>
+    <crm:Address line1="18 Marsh Lane" city="Manchester" postcode="M14 5TQ" country="GB"/>
+    <crm:AccountNumber>004211889301</crm:AccountNumber>
+    <crm:Balance currency="GBP">2450.00</crm:Balance>
+    <crm:Owner>Priya Natarajan</crm:Owner>
+  </crm:Customer>
+  <crm:Customer id="CUS-88214">
+    <crm:FirstName>Diego</crm:FirstName>
+    <crm:LastName>Marques</crm:LastName>
+    <crm:Contact email="d.marques@contoso.example" phone="+91 98765 43210"/>
+    <crm:Address line1="Rua das Flores 128" city="São Paulo" postcode="01310-100" country="BR"/>
+  </crm:Customer>
+  <crm:Customer id="CUS-88215">
+    <crm:FirstName>Siobhán</crm:FirstName>
+    <crm:LastName>O'Brien</crm:LastName>
+    <crm:Email>siobhan.obrien@example.ie</crm:Email>
+    <crm:Address line1="12 Quay Street" city="Cork" postcode="T12 X8Y2" country="IE"/>
+  </crm:Customer>
+</crm:CustomerExport>
+`;
+
+addFile('crm-export.xml', [
+  text('Aisha'), text('Rahman'), text('Priya Natarajan'), text('Diego'), text('Marques'),
+  text("O'Brien"), text('Siobhán'),
+  text('aisha.rahman@northwind.example'), text('d.marques@contoso.example'), text('siobhan.obrien@example.ie'),
+  text('+44 20 7946 0958'), text('+91 98765 43210'), text('1991-04-17'),
+  text('18 Marsh Lane'), text('Manchester'), text('M14 5TQ'),
+  text('Rua das Flores 128'), text('São Paulo'), text('01310-100'),
+  text('12 Quay Street'), text('Cork'), text('T12 X8Y2'), text('004211889301'), text('2450.00'),
+]);
+
+// ------------------------------------------------------------------ SQL dump
+// mysqldump writes `INSERT INTO t VALUES (…)` with no column list; the column
+// names only exist in the CREATE TABLE above it. Quoted apostrophes (`O''Brien`)
+// must both match and be re-escaped on the way back in.
+const sqlDump = `-- MySQL dump 10.13  Distrib 8.0.35, for Linux (x86_64)
+--
+-- Host: db-prod.internal    Database: crm
+-- ------------------------------------------------------
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+
+DROP TABLE IF EXISTS \`customers\`;
+CREATE TABLE \`customers\` (
+  \`customer_id\` int NOT NULL AUTO_INCREMENT,
+  \`first_name\` varchar(40) DEFAULT NULL,
+  \`last_name\` varchar(40) DEFAULT NULL,
+  \`email\` varchar(80) DEFAULT NULL,
+  \`phone\` varchar(30) DEFAULT NULL,
+  \`ssn\` varchar(11) DEFAULT NULL,
+  \`birth_date\` date DEFAULT NULL,
+  \`street\` varchar(80) DEFAULT NULL,
+  \`zip\` varchar(12) DEFAULT NULL,
+  \`annual_salary\` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (\`customer_id\`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
+
+LOCK TABLES \`customers\` WRITE;
+INSERT INTO \`customers\` VALUES (1,'Jane','Doe','jane.doe@acme.example','(415) 555-0138','123-45-6789','1986-04-17','742 Evergreen Terrace','94110',92500.00),(2,'Seán','O''Brien','sean.obrien@example.ie','+353 1 234 5678','987-65-4321','1979-11-02','12 Quay Street','D02 X285',74000.00),(3,'Amara','Okafor','amara.okafor@contoso.example','+1 (604) 555-0192','555-44-3322','1992-08-09','900 Robson Street','V6Z 1A1',68000.00);
+UNLOCK TABLES;
+`;
+
+addFile('customers-dump.sql', [
+  text('Jane'), text('Doe'), text('Seán'), text("O'Brien"), text('Amara'), text('Okafor'),
+  text('jane.doe@acme.example'), text('sean.obrien@example.ie'), text('amara.okafor@contoso.example'),
+  text('(415) 555-0138'), text('+353 1 234 5678'), text('+1 (604) 555-0192'),
+  text('123-45-6789'), text('987-65-4321'), text('555-44-3322'),
+  text('1986-04-17'), text('1979-11-02'), text('1992-08-09'),
+  text('742 Evergreen Terrace'), text('12 Quay Street'), text('900 Robson Street'),
+  text('94110'), text('D02 X285'), text('V6Z 1A1'),
+  text('92500.00'), text('74000.00'), text('68000.00'),
+]);
+
+// -------------------------------------------------------- passport MRZ (text)
+// A scanned passport's text layer. The two 44-character lines carry their own
+// check digits, which is a near-perfect signature for the format.
+const mrzLine1 = 'P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<';
+const mrzLine2 = 'L898902C36UTO7408122F1204159ZE184226B<<<<<10';
+const passportText = `KYC dossier — passport capture
+Applicant: Anna Maria Eriksson
+Date of birth: 1974-08-12
+Nationality: UTO
+Passport number: L898902C3
+Machine-readable zone:
+${mrzLine1}
+${mrzLine2}
+Verified against the original document on 2024-02-12.
+`;
+
+addFile('passport-mrz.txt', [
+  text('Anna Maria Eriksson'), text('L898902C3'), text('1974-08-12'),
+  text(mrzLine1), text(mrzLine2),
+]);
+
+// ------------------------------------------------------- LDAP directory (LDIF)
+const ldif = `dn: cn=Jane Doe,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Jane Doe
+sn: Doe
+givenName: Jane
+mail: jane.doe@example.com
+telephoneNumber: +1 415 555 0138
+uid: jdoe
+employeeNumber: EMP-88213
+homePostalAddress: 742 Evergreen Terrace, Springfield, IL 62704
+userPassword: {SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ=
+
+dn: cn=Robert Chen,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Robert Chen
+sn: Chen
+givenName: Robert
+mail: robert.chen@example.com
+telephoneNumber: +1 206 555 0177
+uid: rchen
+employeeNumber: EMP-88214
+homePostalAddress: 90 Pike Street, Seattle, WA 98101
+userPassword: {SSHA}Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA==
+`;
+
+addFile('directory-export.ldif', [
+  text('Jane Doe'), text('jane.doe@example.com'), text('+1 415 555 0138'),
+  text('EMP-88213'), text('742 Evergreen Terrace, Springfield, IL 62704'),
+  text('{SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ='),
+  text('Robert Chen'), text('robert.chen@example.com'), text('+1 206 555 0177'),
+  text('EMP-88214'), text('90 Pike Street, Seattle, WA 98101'),
+  text('{SSHA}Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA=='),
+]);
+
 // --------------------------------------------------------------------- write
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(path.join(OUT, 'bank-transactions.csv'), csv(bankRows));
 await fs.writeFile(path.join(OUT, 'accounts-receivable.xlsx'), workbookBuffer());
 await fs.writeFile(path.join(OUT, 'user-export.json'), JSON.stringify({ export_version: 2, generated_at: '2024-02-01T09:15:00Z', users }, null, 2) + '\n');
 await fs.writeFile(path.join(OUT, 'kyc-profile.docx'), await docxBuffer());
+await fs.writeFile(path.join(OUT, 'board-deck.pptx'), await pptxBuffer());
 await fs.writeFile(path.join(OUT, 'statement.pdf'), pdfBuffer(pdfLines));
 await fs.writeFile(path.join(OUT, 'support-tickets.csv'), csv(supportRows));
 await fs.writeFile(
@@ -619,6 +1108,15 @@ await fs.writeFile(path.join(OUT, 'contacts.vcf'), vcf);
 await fs.writeFile(path.join(OUT, 'team-calendar.ics'), ics);
 await fs.writeFile(path.join(OUT, 'patient-notes.md'), markdown);
 await fs.writeFile(path.join(OUT, 'access.log'), accessLog);
+await fs.writeFile(path.join(OUT, 'insurance-claims.csv'), csv(claimRows));
+await fs.writeFile(path.join(OUT, 'hr-records.html'), htmlDocument);
+await fs.writeFile(path.join(OUT, 'app-config.env'), envFile);
+await fs.writeFile(path.join(OUT, 'customer-profile.yaml'), yamlFile);
+await fs.writeFile(path.join(OUT, 'mail-encoded.eml'), encodedEml);
+await fs.writeFile(path.join(OUT, 'crm-export.xml'), xmlExport);
+await fs.writeFile(path.join(OUT, 'customers-dump.sql'), sqlDump);
+await fs.writeFile(path.join(OUT, 'passport-mrz.txt'), passportText);
+await fs.writeFile(path.join(OUT, 'directory-export.ldif'), ldif);
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
 for (const file of manifest.files) {

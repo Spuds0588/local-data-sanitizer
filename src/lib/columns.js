@@ -5,7 +5,14 @@
 
 import { parseAmount } from './jiggle.js';
 import { luhnValid } from './rules.js';
-import { abaValid, einValid, ibanValid, normalizeIban } from './identifiers.js';
+import {
+  abaValid,
+  einValid,
+  ibanValid,
+  ipv6Valid,
+  nationalIdScheme,
+  normalizeIban,
+} from './identifiers.js';
 
 const MONEY_WORDS = new Set([
   'amount', 'balance', 'subtotal', 'total', 'price', 'cost', 'debit', 'credit',
@@ -19,6 +26,7 @@ const NAME_WORDS = new Set([
   'agent', 'assignee', 'representative', 'patient', 'insured', 'member',
   'physician', 'provider', 'guardian', 'parent', 'witness', 'signatory',
   'sender', 'recipient', 'attendee', 'organizer', 'author', 'buyer', 'seller',
+  'owner', 'assignee', 'manager', 'director', 'officer',
 ]);
 
 // These headers name an organisation, not a person. Replacing "Northwind
@@ -109,9 +117,47 @@ export function classifyHeader(header) {
   if ((has('tax') && has('id')) || has('ein') || has('tin')) return 'taxId';
   if (has('passport')) return 'passport';
   if (has('license') || has('licence') || has('dl')) return 'license';
+  if (
+    has('aadhaar') ||
+    has('aadhar') ||
+    has('cpf') ||
+    has('nhs') ||
+    has('pesel') ||
+    has('bsn') ||
+    has('nino') ||
+    (has('national') && (hasId || has('insurance'))) ||
+    (has('ni') && (has('number') || has('no'))) ||
+    has('sin') ||
+    has('tfn') ||
+    (has('social') && has('insurance'))
+  ) {
+    return 'nationalId';
+  }
+  if (has('vin') || has('chassis')) return 'vin';
+  if (has('authorization')) return 'apiKey';
+  if (
+    has('lat') ||
+    has('latitude') ||
+    has('lng') ||
+    has('lon') ||
+    has('longitude') ||
+    has('geo') ||
+    has('coordinate')
+  ) {
+    return 'coordinates';
+  }
   if (has('ip') || joined === 'ipaddress') return 'ipAddress';
   if (has('password') || has('passwd') || has('pwd')) return 'password';
-  if (has('apikey') || has('secret') || has('token') || has('credential') || (has('access') && has('key'))) {
+  if (has('cookie')) return 'cookie';
+  if (has('crypto') || has('wallet')) return 'cryptoWallet';
+  if (
+    has('apikey') ||
+    has('secret') ||
+    has('token') ||
+    has('credential') ||
+    (has('access') && has('key')) ||
+    (has('key') && (has('private') || has('ssh') || has('signing') || has('encryption')))
+  ) {
     return 'apiKey';
   }
   if (has('address') || has('street') || has('line1') || has('line2') || has('residence') || has('mailing')) {
@@ -362,13 +408,20 @@ export function extractTypedValue(type, raw, opts = {}) {
         ? { original: text, type }
         : null;
     case 'city':
-      return /^[A-Za-z][A-Za-z .'-]{1,40}$/.test(text) && !/\d/.test(text)
+      // Unicode: "São Paulo" and "Zürich" are cities too.
+      return /^\p{L}[\p{L} .'-]{1,40}$/u.test(text) && !/\d/.test(text)
         ? { original: text, type }
         : null;
     case 'state':
       return /^[A-Z]{2}$/.test(text) ? { original: text, type } : null;
     case 'postalCode':
-      return /^\d{5}(?:-\d{4})?$/.test(text) ? { original: text, type } : null;
+      // US ZIP+4, 4-digit Nordic codes, 6-digit Indian PINs, UK/Canada and the
+      // Irish Eircode (which the numeric rule cannot see).
+      if (/^\d{4,6}(?:-\d{3,4})?$/.test(text)) return { original: text, type };
+      if (/^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i.test(text)) return { original: text, type };
+      if (/^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i.test(text)) return { original: text, type };
+      if (/^[A-Z]\d{2}\s[A-Z0-9]{4}$/i.test(text)) return { original: text, type };
+      return null;
     case 'taxId': {
       const match = /^(\d{2})-?(\d{7})$/.exec(text);
       return match && einValid(`${match[1]}-${match[2]}`) ? { original: text, type } : null;
@@ -378,7 +431,25 @@ export function extractTypedValue(type, raw, opts = {}) {
     case 'license':
       return /^[A-Z0-9][A-Z0-9 -]{5,15}$/.test(text) && /\d/.test(text) ? { original: text, type } : null;
     case 'ipAddress':
-      return isIpv4(text) ? { original: text, type } : null;
+      if (isIpv4(text) || ipv6Valid(text)) return { original: text, type };
+      return null;
+    case 'nationalId':
+      return nationalIdScheme(text) ? { original: text, type } : null;
+    case 'vin':
+      return /^[A-HJ-NPR-Z0-9]{17}$/i.test(text) ? { original: text, type } : null;
+    case 'coordinates': {
+      const numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
+      if (numbers.length === 0 || numbers.length > 2) return null;
+      if (!numbers.every((n) => Math.abs(Number(n)) <= 180)) return null;
+      return { original: text, type };
+    }
+    case 'cookie':
+      return /=/.test(text) && text.length >= 8 && text.length <= 500 ? { original: text, type } : null;
+    case 'cryptoWallet':
+      if (/^0x[a-fA-F0-9]{40}$/.test(text)) return { original: text, type };
+      if (/^bc1[a-z0-9]{25,62}$/.test(text)) return { original: text, type };
+      if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(text)) return { original: text, type };
+      return null;
     case 'password':
       return text.length >= 6 && !/\s/.test(text) ? { original: text, type } : null;
     case 'apiKey':
