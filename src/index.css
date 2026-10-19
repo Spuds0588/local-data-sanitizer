@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* assets/ holds the committed branch bundle; scanning the minified JS there
+   only invents utilities from string literals. */
+@source not "../assets";
+
 :root {
   color-scheme: dark;
 }
