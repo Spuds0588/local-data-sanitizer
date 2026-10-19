@@ -284,7 +284,8 @@ async function docxBuffer() {
       table(kycTable) +
       '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>',
   );
-  return zip.generateAsync({ type: 'nodebuffer' });
+  // Fixed zip timestamps keep the committed fixture byte-stable across runs.
+  return zip.generateAsync({ type: 'nodebuffer', date: new Date('2024-01-01T00:00:00Z') });
 }
 
 addFile('kyc-profile.docx', [
@@ -389,7 +390,7 @@ const supportRows = [
 
 addFile('support-tickets.csv', [
   ...supportRows.slice(1).flatMap((row) => [text(row[0]), text(row[3]), text(row[4]), text(row[5])]),
-  text('Jane Doe'), text('1111'), text('(206) 555-0177'), text('jane.doe@example.com'),
+  text('Jane Doe'), text('ending in 1111'), text('(206) 555-0177'), text('jane.doe@example.com'),
   text('123-45-6789'), text('553100287'), text('88 Cedar Hollow Lane, Portland, OR 97205'),
   text('Winter2024!'), text('Marcus Webb'), text('marcus.webb@example.com'),
   text('742 Evergreen Terrace, Springfield, IL 62704'),
