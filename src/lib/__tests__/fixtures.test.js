@@ -59,6 +59,14 @@ async function extract(result) {
     const text = await blob.text();
     return { name, kind: 'csv', text, rows: parseCsv(text) };
   }
+  if (/\.tsv$/i.test(name)) {
+    const text = await blob.text();
+    return { name, kind: 'tsv', text, rows: parseCsv(text, '\t') };
+  }
+  if (/\.jsonl$/i.test(name)) {
+    const text = await blob.text();
+    return { name, kind: 'jsonl', text, lines: text.split(/\r?\n/).filter((line) => line.trim()) };
+  }
   if (/\.xlsx$/i.test(name)) {
     const wb = XLSX.read(await blob.arrayBuffer(), { type: 'array', cellNF: true, cellText: true });
     return { name, kind: 'sheet', text: sheetText(wb), wb };
@@ -131,7 +139,7 @@ describe('sensitive-data fixture corpus', () => {
       'email', 'phone', 'ssn', 'creditCard', 'creditCardPartial', 'amount',
       'account', 'routing', 'iban', 'name', 'dob', 'address', 'city',
       'postalCode', 'taxId', 'passport', 'license', 'ipAddress', 'password',
-      'apiKey', 'recordId',
+      'apiKey', 'recordId', 'medicalId', 'profileUrl', 'organization',
     ]) {
       expect(types, `no "${type}" entry was produced`).toContain(type);
     }
@@ -177,8 +185,12 @@ describe('sensitive-data fixture corpus', () => {
     expect(data.users[0].address.line1).toMatch(/^\d+\s/);
     expect(data.users[0].address.state).toBe('IL');
 
+    // A phone keeps the original's punctuation shape (bare stays bare, +1 stays
+    // +1), so CSV cells and prose signatures still read the same way.
+    const shape = (value) => String(value).replace(/\d/g, '9');
     for (const entry of entries.filter((item) => item.type === 'phone')) {
-      expect(entry.fakeValue).toMatch(/^\([2-9]\d{2}\) [2-9]\d{2}-\d{4}$/);
+      expect(shape(entry.fakeValue)).toBe(shape(entry.original));
+      expect(entry.fakeValue).not.toBe(entry.original);
     }
   }, TIMEOUT);
 
@@ -258,5 +270,166 @@ describe('sensitive-data fixture corpus', () => {
     expect(account).toBeTruthy();
     const filesWithFake = [...outputs.values()].filter((output) => output.text.includes(account.fakeValue));
     expect(filesWithFake.length).toBeGreaterThanOrEqual(3);
+  }, TIMEOUT);
+
+  it('keeps the TSV payroll grid: tabs, widths and money columns', () => {
+    const { text, rows } = outputs.get('payroll-register.tsv');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toEqual([
+      'Employee ID', 'First Name', 'Last Name', 'Work Email', 'SSN', 'Date of Birth',
+      'Home Address', 'City', 'State', 'ZIP', 'Bank Account', 'Routing Number',
+      'Annual Salary', 'Notes',
+    ]);
+    for (const row of rows.slice(1)) {
+      expect(row).toHaveLength(14);
+      // A bank account keeps its width and digits-only shape.
+      expect(row[10]).toMatch(/^\d{9}$/);
+      // An unnamed person is still a two-token name in the right columns.
+      expect(row[1]).toMatch(/^[A-Z]/);
+      expect(row[2]).toMatch(/^[A-Z]/);
+      expect(row[9]).toMatch(/^\d{5}$/);
+      expect(row[13]).toMatch(/^Emergency contact: |^Reach |^Payroll contact: /);
+    }
+  }, TIMEOUT);
+
+  it('keeps the JSONL event stream one object per line and typed', () => {
+    const { lines } = outputs.get('crm-events.jsonl');
+    expect(lines).toHaveLength(4);
+    const events = lines.map((line) => JSON.parse(line));
+    expect(events.map((event) => event.event)).toEqual([
+      'contact.created', 'note.added', 'deal.updated', 'contact.updated',
+    ]);
+    // Timestamps, booleans and fixed vocabulary must not be touched.
+    expect(events.map((event) => event.at)).toEqual([
+      '2024-02-05T11:02:00Z', '2024-02-05T11:09:00Z',
+      '2024-02-06T08:31:00Z', '2024-02-06T08:33:00Z',
+    ]);
+    expect(events[2].stage).toBe('negotiation');
+    expect(events[3].field).toBe('balance');
+    // Money keeps its JSON number type.
+    expect(typeof events[2].amount).toBe('number');
+    expect(events[2].amount).not.toBe(4800);
+    expect(typeof events[3].balance).toBe('number');
+    // The nested contact keeps its schema, with the ID rewritten in place.
+    const contact = events[0].contact;
+    expect(Object.keys(contact)).toEqual([
+      'id', 'full_name', 'first_name', 'last_name', 'email', 'phone', 'date_of_birth',
+      'ssn', 'company', 'linkedin', 'address', 'credit_limit', 'balance',
+    ]);
+    expect(contact.id).toMatch(/^CNT-\d{4}$/);
+    expect(contact.address.state).toBe('MA');
+    expect(events[1].body).toMatch(/^Left voicemail on [\d()-]+\. Backup number [\d()-]+\. SSN on file \d{3}-\d{2}-\d{4}\.$/);
+  }, TIMEOUT);
+
+  const linesOf = (text) => text.split(/\r?\n/);
+  const NAME = "[A-Z][A-Za-z'’-]+(?: [A-Z][A-Za-z'’-]+)+";
+
+  it('keeps the email a valid multipart message with its headers', () => {
+    const { text } = outputs.get('support-thread.eml');
+    // CRLF line endings, MIME boundary and both parts survive intact.
+    expect(text).toContain('\r\n');
+    expect(text.startsWith('From: ')).toBe(true);
+    expect(text).toContain('Content-Type: multipart/alternative; boundary="----=_Part_1234"');
+    expect(text).toContain('------=_Part_1234--');
+    const lines = linesOf(text);
+    expect(lines.filter((line) => /^Content-Type: text\/(plain|html); charset="utf-8"$/.test(line))).toHaveLength(2);
+    expect(lines.some((line) => /^From: "[^"]+" <[^@\s]+@[^>]+>$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^To: "[^"]+" <[^@\s]+@[^>]+>$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^Subject: Re: refund for card ending in \d{4}$/.test(line))).toBe(true);
+    // The signature and the tel: link keep their shape.
+    expect(text).toMatch(/\r\nThanks,\r\n.+\r\n/);
+    expect(text).toMatch(/<a href="tel:\d{3}-\d{3}-\d{4}">\d{3}-\d{3}-\d{4}<\/a>/);
+  }, TIMEOUT);
+
+  it('keeps the vCard property structure and field order', () => {
+    const { text } = outputs.get('contacts.vcf');
+    expect(text.startsWith('BEGIN:VCARD')).toBe(true);
+    expect(text.trimEnd().endsWith('END:VCARD')).toBe(true);
+    const lines = linesOf(text).filter(Boolean);
+    expect(lines).toContain('VERSION:3.0');
+    // N has five semicolon-separated components, like the original.
+    const n = lines.find((line) => line.startsWith('N:'));
+    const components = n.slice(2).split(';');
+    expect(components).toHaveLength(5);
+    expect(components.slice(0, 3).every(Boolean)).toBe(true);
+    expect(lines.some((line) => new RegExp(`^FN:${NAME}$`).test(line))).toBe(true);
+    expect(lines.some((line) => /^ORG:.+/.test(line))).toBe(true);
+    expect(lines.some((line) => /^TEL;TYPE=CELL:\+1 \(\d{3}\) \d{3}-\d{4}$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^EMAIL;TYPE=WORK:[^@\s]+@[^\s]+$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^BDAY:\d{4}-\d{2}-\d{2}$/.test(line))).toBe(true);
+    expect(text).not.toContain('BDAY:1990-03-03');
+    expect(lines.some((line) => /^ADR;TYPE=HOME:;;[^;]+;[^;]+;[A-Z]{2};\d{5};[A-Z]+$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^URL:https:\/\/www\.linkedin\.com\/in\/[^\s]+$/.test(line))).toBe(true);
+  }, TIMEOUT);
+
+  it('keeps the calendar valid, folded and event-time intact', () => {
+    const { text } = outputs.get('team-calendar.ics');
+    expect(text.startsWith('BEGIN:VCALENDAR')).toBe(true);
+    expect(text.trimEnd().endsWith('END:VCALENDAR')).toBe(true);
+    expect(text).toContain('BEGIN:VEVENT');
+    expect(text).toContain('DTSTART:20240315T140000Z');
+    expect(text).toContain('DTEND:20240315T150000Z');
+    expect(text).toContain('UID:7f2c1d9e-4a6b-4c8d-9e0f-1a2b3c4d5e6f');
+    const lines = linesOf(text).filter(Boolean);
+    // Property assertions run on the unfolded content: a long value may be
+    // folded for transport, which does not change the calendar.
+    const logical = linesOf(text.replace(/\r\n /g, '')).filter(Boolean);
+    expect(logical.some((line) => new RegExp(`^SUMMARY:Benefits review with ${NAME}$`).test(line))).toBe(true);
+    expect(logical.some((line) => /^ORGANIZER;CN=[^:]+:mailto:[^@\s]+@[^\s]+$/.test(line))).toBe(true);
+    expect(logical.some((line) => /^ATTENDEE;CN=[^;]+;ROLE=REQ-PARTICIPANT:mailto:[^@\s]+@[^\s]+$/.test(line))).toBe(true);
+    expect(logical.some((line) => /^LOCATION:\d+ .+, [^,]+, [A-Z]{2} \d{5}$/.test(line))).toBe(true);
+    // The long DESCRIPTION is folded, and every physical line stays <= 75 chars.
+    expect(text).toMatch(/\r\n /);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(75);
+    expect(text.replace(/\r\n /g, '')).toMatch(/Questions to [^\s]+@[^\s]+\./);
+  }, TIMEOUT);
+
+  it('keeps the Markdown layout: heading, bold labels and pipe table', () => {
+    const { text } = outputs.get('patient-notes.md');
+    const lines = text.split('\n').filter(Boolean);
+    expect(lines[0]).toMatch(new RegExp(`^# Patient: ${NAME}$`));
+    expect(text).not.toContain('Aisha Rahman');
+    for (const label of ['MRN', 'Member ID', 'Date of birth', 'Phone', 'Email', 'Address', 'Payer', 'Primary care']) {
+      expect(text, `${label} label must survive`).toContain(`**${label}:**`);
+    }
+    expect(text).toMatch(/^\*\*Date of birth:\*\* [A-Z][a-z]+ \d{1,2}, \d{4}$/m);
+    expect(text).toMatch(/^\*\*MRN:\*\* [A-Z]{3}-\d{5}$/m);
+    const table = lines.filter((line) => line.startsWith('|'));
+    expect(table).toHaveLength(4);
+    for (const row of table) expect(row.split('|')).toHaveLength(6);
+    // The prose still names the same (fake) patient as the heading, by the
+    // first name the heading established.
+    const headingName = /^# Patient: (.+)$/m.exec(text)[1];
+    expect(text).toContain(`${headingName.split(' ')[0]} presented for a routine follow-up.`);
+  }, TIMEOUT);
+
+  it('keeps log lines parseable: timestamps, status codes and bearer prefix', () => {
+    const { text } = outputs.get('access.log');
+    const lines = text.trimEnd().split('\n');
+    expect(lines).toHaveLength(6);
+    expect(lines[0]).toMatch(/^\d+\.\d+\.\d+\.\d+ - - \[03\/Feb\/2024:14:22:00 \+0000\] "POST \/api\/login HTTP\/1\.1" 200 512 /);
+    for (const stamp of [
+      '2024-02-03T14:22:05Z', '2024-02-03T14:22:09Z', '2024-02-03T14:22:11Z',
+      '2024-02-03T14:22:12Z', '2024-02-03T14:23:40Z',
+    ]) {
+      expect(text, `${stamp} must not be jiggled or shifted`).toContain(stamp);
+    }
+    expect(text).toContain('currency=USD');
+    expect(text).toContain('Authorization: Bearer ');
+    expect(lines[1]).toMatch(/^2024-02-03T14:22:05Z WARN auth user_id=[A-Z]{3}-\d{5} email=\S+ ip=\d+\.\d+\.\d+\.\d+ status=ok$/);
+    expect(lines[5]).toMatch(/phone=\(\d{3}\)\d{3}-\d{4} owner=\S+@\S+$/);
+  }, TIMEOUT);
+
+  it('keeps one fake identity across every document that mentions it', () => {
+    for (const [original, type] of [
+      ['Camille Dubois', 'name'],
+      ['nadia.okafor@riverside.example', 'email'],
+      ['USR-88213', 'recordId'],
+    ]) {
+      const entry = entries.find((item) => item.type === type && item.original === original);
+      expect(entry, `missing ${type} entry for ${original}`).toBeTruthy();
+      const files = [...outputs.values()].filter((output) => output.text.includes(entry.fakeValue));
+      expect(files.length, `${original} -> ${entry.fakeValue} should appear in several files`).toBeGreaterThanOrEqual(2);
+    }
   }, TIMEOUT);
 });

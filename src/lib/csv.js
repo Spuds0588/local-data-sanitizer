@@ -5,7 +5,7 @@
 // tables (mangling non-ASCII). CSV is a first-class input here, so we read the
 // decoded UTF-8 text ourselves and keep every cell an exact string.
 
-export function parseCsv(input) {
+export function parseCsv(input, delimiter = ',') {
   const text = String(input ?? '').replace(/^\uFEFF/, '');
   const rows = [];
   let row = [];
@@ -27,7 +27,7 @@ export function parseCsv(input) {
       }
     } else if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === delimiter) {
       row.push(field);
       field = '';
     } else if (ch === '\n') {
@@ -48,15 +48,16 @@ export function parseCsv(input) {
   return rows;
 }
 
-export function formatCsv(rows) {
+export function formatCsv(rows, delimiter = ',') {
+  const needsQuotes = new RegExp(`["\\r\\n${delimiter === '\t' ? '\\t' : delimiter}]`);
   const body = rows
     .map((row) =>
       row
         .map((cell) => {
           const value = String(cell ?? '');
-          return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+          return needsQuotes.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
         })
-        .join(','),
+        .join(delimiter),
     )
     .join('\n');
   return `${body}\n`;

@@ -48,7 +48,7 @@ export default function FilesStep({ files, errors, onFiles, onRemove, onClear })
         <UploadIcon size={24} />
         <p className="text-xs font-medium">Drop files or click to browse</p>
         <p className="text-[11px] text-neutral-400">
-          .docx · .xlsx · .xls · .csv · .json · .pdf · max {MAX_MB} MB each
+          .docx · .xlsx · .csv/.tsv · .json/.jsonl · .pdf · .txt/.md · .eml/.vcf/.ics · max {MAX_MB} MB each
         </p>
       </div>
 

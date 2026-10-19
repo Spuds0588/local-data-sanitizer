@@ -1082,6 +1082,473 @@
           "match": "text"
         }
       ]
+    },
+    {
+      "name": "payroll-register.tsv",
+      "secrets": [
+        {
+          "value": "EMP-2041",
+          "match": "text"
+        },
+        {
+          "value": "Elena",
+          "match": "text"
+        },
+        {
+          "value": "Vasquez",
+          "match": "text"
+        },
+        {
+          "value": "Elena Vasquez",
+          "match": "text"
+        },
+        {
+          "value": "elena.vasquez@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "412887315",
+          "match": "text"
+        },
+        {
+          "value": "April 17, 1986",
+          "match": "text"
+        },
+        {
+          "value": "1187 Juniper Way",
+          "match": "text"
+        },
+        {
+          "value": "Boise",
+          "match": "text"
+        },
+        {
+          "value": "83702",
+          "match": "text"
+        },
+        {
+          "value": "441900273",
+          "match": "text"
+        },
+        {
+          "value": "021000021",
+          "match": "text"
+        },
+        {
+          "value": "85000",
+          "match": "number"
+        },
+        {
+          "value": "EMP-2042",
+          "match": "text"
+        },
+        {
+          "value": "Tomas",
+          "match": "text"
+        },
+        {
+          "value": "Brandt",
+          "match": "text"
+        },
+        {
+          "value": "Tomas Brandt",
+          "match": "text"
+        },
+        {
+          "value": "tomas.brandt@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "508-63-9917",
+          "match": "text"
+        },
+        {
+          "value": "11/02/1979",
+          "match": "text"
+        },
+        {
+          "value": "44 Alder Court",
+          "match": "text"
+        },
+        {
+          "value": "Austin",
+          "match": "text"
+        },
+        {
+          "value": "78701",
+          "match": "text"
+        },
+        {
+          "value": "603118452",
+          "match": "text"
+        },
+        {
+          "value": "325081403",
+          "match": "text"
+        },
+        {
+          "value": "92000",
+          "match": "number"
+        },
+        {
+          "value": "EMP-2043",
+          "match": "text"
+        },
+        {
+          "value": "Aisha",
+          "match": "text"
+        },
+        {
+          "value": "Rahman",
+          "match": "text"
+        },
+        {
+          "value": "Aisha Rahman",
+          "match": "text"
+        },
+        {
+          "value": "aisha.rahman@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "627449018",
+          "match": "text"
+        },
+        {
+          "value": "1992-08-23",
+          "match": "text"
+        },
+        {
+          "value": "902 Birch Street",
+          "match": "text"
+        },
+        {
+          "value": "Denver",
+          "match": "text"
+        },
+        {
+          "value": "80202",
+          "match": "text"
+        },
+        {
+          "value": "771904326",
+          "match": "text"
+        },
+        {
+          "value": "118000",
+          "match": "number"
+        },
+        {
+          "value": "Rosa Vasquez",
+          "match": "text"
+        },
+        {
+          "value": "208-555-0141",
+          "match": "text"
+        },
+        {
+          "value": "512-555-0188",
+          "match": "text"
+        },
+        {
+          "value": "Dana Whitfield",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "crm-events.jsonl",
+      "secrets": [
+        {
+          "value": "CNT-5521",
+          "match": "text"
+        },
+        {
+          "value": "Nadia Okafor",
+          "match": "text"
+        },
+        {
+          "value": "Nadia",
+          "match": "text"
+        },
+        {
+          "value": "Okafor",
+          "match": "text"
+        },
+        {
+          "value": "nadia.okafor@riverside.example",
+          "match": "text"
+        },
+        {
+          "value": "+1 (617) 555-0110",
+          "match": "text"
+        },
+        {
+          "value": "March 3, 1990",
+          "match": "text"
+        },
+        {
+          "value": "219-88-4433",
+          "match": "text"
+        },
+        {
+          "value": "Riverside Analytics",
+          "match": "text"
+        },
+        {
+          "value": "https://www.linkedin.com/in/nadiaokafor",
+          "match": "text"
+        },
+        {
+          "value": "410 Maple Grove Avenue",
+          "match": "text"
+        },
+        {
+          "value": "Cambridge",
+          "match": "text"
+        },
+        {
+          "value": "02139",
+          "match": "text"
+        },
+        {
+          "value": "18000",
+          "match": "number"
+        },
+        {
+          "value": "Dana Whitfield",
+          "match": "text"
+        },
+        {
+          "value": "617-555-0110",
+          "match": "text"
+        },
+        {
+          "value": "617-555-0199",
+          "match": "text"
+        },
+        {
+          "value": "4800",
+          "match": "number"
+        },
+        {
+          "value": "4250",
+          "match": "number"
+        }
+      ]
+    },
+    {
+      "name": "support-thread.eml",
+      "secrets": [
+        {
+          "value": "Camille Dubois",
+          "match": "text"
+        },
+        {
+          "value": "camille.dubois@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "priya.n@example.com",
+          "match": "text"
+        },
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "ending in 4021",
+          "match": "text"
+        },
+        {
+          "value": "617-555-0110",
+          "match": "text"
+        },
+        {
+          "value": "684-77-2109",
+          "match": "text"
+        },
+        {
+          "value": "07/09/1984",
+          "match": "text"
+        },
+        {
+          "value": "85 Harbor View Road, Portland, ME 04101",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "contacts.vcf",
+      "secrets": [
+        {
+          "value": "Nadia Okafor",
+          "match": "text"
+        },
+        {
+          "value": "Okafor",
+          "match": "text"
+        },
+        {
+          "value": "Nadia",
+          "match": "text"
+        },
+        {
+          "value": "Amara",
+          "match": "text"
+        },
+        {
+          "value": "Riverside Analytics",
+          "match": "text"
+        },
+        {
+          "value": "+1 (617) 555-0110",
+          "match": "text"
+        },
+        {
+          "value": "nadia.okafor@riverside.example",
+          "match": "text"
+        },
+        {
+          "value": "1990-03-03",
+          "match": "text"
+        },
+        {
+          "value": "410 Maple Grove Avenue",
+          "match": "text"
+        },
+        {
+          "value": "Cambridge",
+          "match": "text"
+        },
+        {
+          "value": "02139",
+          "match": "text"
+        },
+        {
+          "value": "https://www.linkedin.com/in/nadiaokafor",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "team-calendar.ics",
+      "secrets": [
+        {
+          "value": "Camille Dubois",
+          "match": "text"
+        },
+        {
+          "value": "camille.dubois@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "Nadia Okafor",
+          "match": "text"
+        },
+        {
+          "value": "nadia.okafor@riverside.example",
+          "match": "text"
+        },
+        {
+          "value": "410 Maple Grove Avenue, Cambridge, MA 02139",
+          "match": "text"
+        },
+        {
+          "value": "617-555-0110",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "patient-notes.md",
+      "secrets": [
+        {
+          "value": "Aisha Rahman",
+          "match": "text"
+        },
+        {
+          "value": "Aisha",
+          "match": "text"
+        },
+        {
+          "value": "MRN-77420",
+          "match": "text"
+        },
+        {
+          "value": "HP-44821-07",
+          "match": "text"
+        },
+        {
+          "value": "January 30, 1988",
+          "match": "text"
+        },
+        {
+          "value": "(303) 555-0164",
+          "match": "text"
+        },
+        {
+          "value": "aisha.rahman@example.org",
+          "match": "text"
+        },
+        {
+          "value": "902 Birch Street, Denver, CO 80202",
+          "match": "text"
+        },
+        {
+          "value": "BlueRidge Health Plan",
+          "match": "text"
+        },
+        {
+          "value": "Dana Whitfield",
+          "match": "text"
+        },
+        {
+          "value": "billing@blueridge.example",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "access.log",
+      "secrets": [
+        {
+          "value": "203.0.113.77",
+          "match": "text"
+        },
+        {
+          "value": "USR-88213",
+          "match": "text"
+        },
+        {
+          "value": "nadia.okafor@riverside.example",
+          "match": "text"
+        },
+        {
+          "value": "198.51.100.17",
+          "match": "text"
+        },
+        {
+          "value": "1250.00",
+          "match": "number"
+        },
+        {
+          "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJVU1ItODgyMTMifQ.7xQ2m9pL0vR4sT8wY1zA6bC3dE5f",
+          "match": "text"
+        },
+        {
+          "value": "(617)555-0110",
+          "match": "text"
+        }
+      ]
     }
   ]
 }

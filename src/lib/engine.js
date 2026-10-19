@@ -5,7 +5,7 @@ import { generateFake } from './fake.js';
 import { getParser } from './parsers/index.js';
 import { escapeRegExp } from './text.js';
 
-const CASELESS_TYPES = new Set(['custom', 'email', 'name', 'password']);
+const CASELESS_TYPES = new Set(['custom', 'email', 'name', 'password', 'organization']);
 
 /** Case-insensitive types share one dictionary entry regardless of casing. */
 export function canonicalKey(type, value) {
@@ -68,20 +68,37 @@ const GENERIC_NAME_WORDS = new Set([
 
 export function expandEntries(entries, texts = []) {
   const out = [...entries];
-  const taken = new Set(entries.map((e) => `${e.type}:${canonicalKey(e.type, e.original)}`));
+  const byKey = new Map(out.map((e) => [`${e.type}:${canonicalKey(e.type, e.original)}`, e]));
+  // Entries whose fake value is already tied to a full name (either derived
+  // from one, or adopted by one) must not be rewritten by a later parent.
+  const locked = new Set();
 
   const add = (original, fakeValue, parent, type, searchTexts) => {
     const key = canonicalKey(type, original);
-    if (original.length < 3 || taken.has(`${type}:${key}`)) return;
+    if (original.length < 3) return;
     if (type === 'name' && GENERIC_NAME_WORDS.has(original.toLowerCase())) return;
     if (original.toLowerCase() === String(fakeValue).toLowerCase()) return;
+    const id = `${type}:${key}`;
+
+    const existing = byKey.get(id);
+    if (existing) {
+      // A split "First Name"/"Last Name" column produces a standalone "Aisha"
+      // entry; it must agree with the "Aisha" inside "Aisha Rahman" typed from
+      // another file, or the same person gets two different first names.
+      if (!locked.has(id) && String(existing.fakeValue).toLowerCase() !== String(fakeValue).toLowerCase()) {
+        existing.fakeValue = fakeValue;
+        locked.add(id);
+      }
+      return;
+    }
+
     // "Northwest Community Bank" says nothing about a standalone "Bank": the
     // phrase itself contains that word, so strip it before counting tokens.
     const { count, context } = occurrenceStats(searchTexts, original);
     if (count === 0) return;
-    taken.add(`${type}:${key}`);
-    out.push({
-      id: `${type}:${key}`,
+    locked.add(id);
+    const entry = {
+      id,
       key,
       type,
       original,
@@ -90,7 +107,9 @@ export function expandEntries(entries, texts = []) {
       context: context || parent.context,
       enabled: true,
       derivedFrom: parent.id,
-    });
+    };
+    byKey.set(id, entry);
+    out.push(entry);
   };
 
   for (const entry of entries) {
@@ -100,11 +119,41 @@ export function expandEntries(entries, texts = []) {
     const fakes = String(entry.fakeValue).trim().split(/\s+/);
     if (fakes.length !== originals.length) continue;
     const searchTexts = texts.map((text) => stripPhrase(text, entry.original));
-    originals.forEach((original, i) => add(original, fakes[i], entry, entry.type, searchTexts));
+    originals.forEach((original, i) => {
+      add(original, fakes[i], entry, entry.type, searchTexts);
+      // "Doe, Jane" keeps its comma in the fake; also map the bare token so
+      // "Doe called" elsewhere still resolves to the same surname.
+      const cleaned = original.replace(/[,;:]+$/, '');
+      if (cleaned !== original && cleaned.length >= 3) {
+        add(cleaned, String(fakes[i]).replace(/[,;:]+$/, ''), entry, entry.type, searchTexts);
+      }
+    });
     add(originals.join(''), fakes.join(''), entry, entry.type, searchTexts);
   }
 
   return out;
+}
+
+/**
+ * A masked SSN / "SSN ending in 2244" must not keep the real last four when
+ * the full number is also in the session: link it to the full number's fake.
+ */
+export function linkSsnFragments(entries, used = new Set()) {
+  const ssns = new Map();
+  for (const entry of entries) {
+    if (entry.type !== 'ssn') continue;
+    const original = lastFour(entry.original);
+    const fake = lastFour(entry.fakeValue);
+    if (original && fake && !ssns.has(original)) ssns.set(original, fake);
+  }
+  for (const entry of entries) {
+    if (entry.type !== 'ssnPartial') continue;
+    const fake = ssns.get(lastFour(entry.original)) || generateFake('ssnPartial', entry.original, used);
+    entry.fakeValue = /\d{4}(?!.*\d)/.test(entry.original)
+      ? entry.original.replace(/\d{4}(?!.*\d)/, fake)
+      : fake;
+  }
+  return entries;
 }
 
 /**
@@ -272,9 +321,10 @@ export async function analyzeFiles(files, config, log = () => {}) {
   }));
   entries = expandEntries(entries, texts);
   entries = linkCardFragments(entries, used);
+  entries = linkSsnFragments(entries, used);
 
+  // Never dump the dictionary itself to the console: it holds the originals.
   log(`Detection complete: ${entries.length} unique item(s) across ${files.length} file(s).`);
-  console.log('[Engine] Entries:', entries);
   return entries;
 }
 

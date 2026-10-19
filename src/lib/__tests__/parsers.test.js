@@ -4,7 +4,10 @@ import * as XLSX from 'xlsx';
 import * as jsonParser from '../parsers/jsonParser.js';
 import * as xlsxParser from '../parsers/xlsxParser.js';
 import * as docxParser from '../parsers/docxParser.js';
+import * as textParser from '../parsers/textParser.js';
+import * as jsonlParser from '../parsers/jsonlParser.js';
 import { analyzeFiles, sanitizeFiles } from '../engine.js';
+import { DEFAULT_CONFIG } from '../rules.js';
 
 const entries = [
   { id: 'e1', type: 'email', original: 'john@acme.com', fakeValue: 'fake@x.com', enabled: true },
@@ -173,6 +176,138 @@ describe('docxParser', () => {
     expect(xml).toContain('Project Alpha');
     expect(xml).not.toContain('john@acme.com');
     expect(xml).toContain('<w:t>');
+  });
+});
+
+describe('textParser', () => {
+  const textFile = (text, name) => new File([text], name);
+
+  it('types values from Markdown labels, including the colon-inside-bold form', async () => {
+    const md = [
+      '# Patient: Jane Doe',
+      '',
+      '**MRN:** MRN-77420',
+      '**Date of birth:** January 30, 1988',
+      '**Phone:** (303) 555-0164',
+      '',
+    ].join('\n');
+    const file = textFile(md, 'notes.md');
+    const entries = await analyzeFiles([file], DEFAULT_CONFIG);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'medicalId', original: 'MRN-77420' }),
+        expect.objectContaining({ type: 'dob', original: 'January 30, 1988' }),
+        expect.objectContaining({ type: 'name', original: 'Jane Doe' }),
+      ]),
+    );
+    const [{ blob, name }] = await sanitizeFiles([file], entries);
+    const out = await blob.text();
+    expect(name).toBe('notes.sanitized.md');
+    expect(out).toContain('**MRN:** ');
+    expect(out).toContain('**Date of birth:** ');
+    expect(out).not.toContain('MRN-77420');
+    expect(out).not.toContain('January 30, 1988');
+    expect(out.startsWith('# Patient: ')).toBe(true);
+  });
+
+  it('types Markdown table cells from their header row', async () => {
+    const md = [
+      '| Visit date | Physician | MRN |',
+      '| --- | --- | --- |',
+      '| 2024-01-09 | Dana Whitfield | MRN-77420 |',
+      '',
+    ].join('\n');
+    const entries = await analyzeFiles([textFile(md, 'visits.md')], DEFAULT_CONFIG);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'name', original: 'Dana Whitfield' }),
+        expect.objectContaining({ type: 'medicalId', original: 'MRN-77420' }),
+      ]),
+    );
+  });
+
+  it('types key=value pairs inside a log line', async () => {
+    const log = '2024-02-03T14:22:05Z WARN auth user_id=USR-88213 phone=(617)555-0110\n';
+    const entries = await analyzeFiles([textFile(log, 'access.log')], DEFAULT_CONFIG);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'recordId', original: 'USR-88213' }),
+        expect.objectContaining({ type: 'phone', original: '(617)555-0110' }),
+      ]),
+    );
+  });
+
+  it('replaces a value split across an iCalendar fold and refolds to 75 chars', async () => {
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT',
+      'DTSTART:20240315T140000Z',
+      'ORGANIZER;CN=Camille Dubois:mailto:camille.dubois@northwind.example',
+      'DESCRIPTION:Questions to camille.dubois@northwind.example about the',
+      '  dial-in.',
+      'END:VEVENT',
+      'END:VCALENDAR',
+      '',
+    ].join('\r\n');
+    // Fold the address itself, the way a real calendar would.
+    const folded = ics.replace('camille.dubois@northwind.example about', 'camille.dubois@northwind.exam\r\n ple about');
+    const entries = await analyzeFiles([textFile(folded, 'invite.ics')], DEFAULT_CONFIG);
+    expect(entries.some((entry) => entry.type === 'email' && entry.original === 'camille.dubois@northwind.example')).toBe(true);
+    const [{ blob }] = await sanitizeFiles([textFile(folded, 'invite.ics')], entries);
+    const out = await blob.text();
+    expect(out).not.toContain('camille.dubois');
+    for (const line of out.split('\r\n')) expect(line.length).toBeLessThanOrEqual(75);
+    expect(out.replace(/\r\n /g, '')).toContain('DTSTART:20240315T140000Z');
+  });
+
+  it('rewrites vCard N components consistently with FN', async () => {
+    const vcf = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'N:Okafor;Nadia;Amara;;',
+      'FN:Nadia Okafor',
+      'END:VCARD',
+      '',
+    ].join('\r\n');
+    const entries = await analyzeFiles([textFile(vcf, 'contact.vcf')], DEFAULT_CONFIG);
+    const [{ blob }] = await sanitizeFiles([textFile(vcf, 'contact.vcf')], entries);
+    const out = await blob.text();
+    for (const original of ['Okafor', 'Nadia', 'Amara']) expect(out).not.toContain(original);
+    const n = out.split(/\r?\n/).find((line) => line.startsWith('N:'));
+    expect(n.slice(2).split(';')).toHaveLength(5);
+    const fn = out.split(/\r?\n/).find((line) => line.startsWith('FN:'));
+    const [first, last] = fn.slice(3).split(' ');
+    // The structured family/given components are the same person as FN.
+    const [family, given] = n.slice(2).split(';');
+    expect(family).toBe(last);
+    expect(given).toBe(first);
+  });
+});
+
+describe('jsonlParser', () => {
+  it('transforms JSON lines and falls back to text on a non-JSON line', async () => {
+    const text = [
+      '{"email":"a@b.com","balance":4250,"active":true}',
+      'plain log line for a@b.com',
+      '',
+    ].join('\n');
+    const file = new File([text], 'events.jsonl', { type: 'application/x-ndjson' });
+    const entries = await analyzeFiles([file], DEFAULT_CONFIG);
+    const [{ blob, name }] = await sanitizeFiles([file], entries);
+    expect(name).toBe('events.sanitized.jsonl');
+    const [jsonLine, logLine] = (await blob.text()).split('\n');
+    const parsed = JSON.parse(jsonLine);
+    expect(parsed.email).not.toBe('a@b.com');
+    expect(parsed.active).toBe(true);
+    expect(typeof parsed.balance).toBe('number');
+    expect(logLine).not.toContain('a@b.com');
+    expect(logLine.startsWith('plain log line for ')).toBe(true);
+  });
+
+  it('detects string values from each line', async () => {
+    const text = '{"user":"Jane Doe"}\n{"user":"Robert Chen"}\n';
+    const segments = await jsonlParser.detect(new File([text], 'u.jsonl'));
+    expect(segments).toEqual(expect.arrayContaining(['Jane Doe', 'Robert Chen']));
   });
 });
 

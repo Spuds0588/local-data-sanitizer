@@ -1,0 +1,6 @@
+203.0.113.77 - - [03/Feb/2024:14:22:00 +0000] "POST /api/login HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+2024-02-03T14:22:05Z WARN auth user_id=USR-88213 email=nadia.okafor@riverside.example ip=198.51.100.17 status=ok
+2024-02-03T14:22:09Z INFO transfer user_id=USR-88213 amount=1250.00 currency=USD
+2024-02-03T14:22:11Z ERROR api call failed reason=expired_token
+2024-02-03T14:22:12Z ERROR api retry Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJVU1ItODgyMTMifQ.7xQ2m9pL0vR4sT8wY1zA6bC3dE5f
+2024-02-03T14:23:40Z INFO contact phone=(617)555-0110 owner=nadia.okafor@riverside.example

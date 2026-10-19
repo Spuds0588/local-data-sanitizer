@@ -115,6 +115,21 @@ function transform(value, entries, amounts, typedNumbers, key = '') {
   return value;
 }
 
+/** Collect detection metadata from an already-parsed JSON value (JSONL uses this). */
+export function collectJsonMeta(data) {
+  const segments = [];
+  const moneyNumbers = [];
+  const typedValues = [];
+  collectStrings(data, segments, moneyNumbers, typedValues);
+  return { segments, moneyNumbers, typedValues };
+}
+
+/** Transform a parsed JSON value with an approved dictionary (JSONL uses this). */
+export function sanitizeJsonValue(data, entries) {
+  const textEntries = entries.filter((entry) => entry && !entry.numericOnly);
+  return transform(data, textEntries, amountMap(entries), typedNumberMap(entries));
+}
+
 async function readJson(file) {
   const text = await file.text();
   try {
@@ -126,10 +141,7 @@ async function readJson(file) {
 
 export async function detectWithMeta(file) {
   const data = await readJson(file);
-  const segments = [];
-  const moneyNumbers = [];
-  const typedValues = [];
-  collectStrings(data, segments, moneyNumbers, typedValues);
+  const { segments, moneyNumbers, typedValues } = collectJsonMeta(data);
   console.log(
     `[JSON Parser] ${file.name}: collected ${segments.length} string(s), ` +
       `${moneyNumbers.length} money-keyed number(s), ${typedValues.length} typed value(s).`,
@@ -146,8 +158,7 @@ export async function sanitize(file, entries) {
   const data = await readJson(file);
   // Bare-number entries are only safe to apply to numeric leaves; replacing
   // "4250" inside an unrelated string could corrupt an ID.
-  const textEntries = entries.filter((entry) => entry && !entry.numericOnly);
-  const text = JSON.stringify(transform(data, textEntries, amountMap(entries), typedNumberMap(entries)), null, 2);
+  const text = JSON.stringify(sanitizeJsonValue(data, entries), null, 2);
   console.log(`[JSON Parser] ${file.name}: wrote ${text.length} sanitized chars.`);
   return { blob: new Blob([text], { type: 'application/json' }), name: sanitizedName(file.name, 'json') };
 }

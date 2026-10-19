@@ -2,7 +2,7 @@
 
 import JSZip from 'jszip';
 import { applyEntriesToText, sanitizedName } from '../text.js';
-import { classifyHeader, extractTypedValue } from '../columns.js';
+import { classifyHeader, extractTypedValue, looksLikeName } from '../columns.js';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -29,6 +29,44 @@ async function documentXml(zip, file) {
   const entry = zip.file('word/document.xml');
   if (!entry) throw new Error(`Not a valid .docx: word/document.xml missing in "${file.name}".`);
   return entry.async('string');
+}
+
+/**
+ * Every text-bearing part of the package. Headers/footers and notes carry real
+ * PII (letterheads, signatures) and must be scanned and rewritten too.
+ */
+async function textParts(zip) {
+  const names = Object.keys(zip.files).filter(
+    (name) => /^word\/(document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml$/.test(name) && !zip.files[name].dir,
+  );
+  const parts = [];
+  for (const name of names) parts.push({ name, xml: await zip.file(name).async('string') });
+  return parts;
+}
+
+const TITLE_STOPWORDS = new Set([
+  'curriculum vitae', 'resume', 'cv', 'confidential', 'draft', 'invoice',
+  'statement', 'report', 'agreement', 'contract', 'letter', 'memo', 'notes',
+  'summary', 'profile', 'application', 'form', 'proposal',
+]);
+
+/**
+ * A Title-styled first paragraph is how resumes, letters and contracts name the
+ * person. Style is structure (like a table header), not a guess from prose, so
+ * it types the value without scanning every heading in the document.
+ */
+function titleName(xml, typedValues) {
+  const re = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
+  let match;
+  while ((match = re.exec(xml)) !== null) {
+    const style = /<w:pStyle\s+w:val="([^"]+)"/.exec(match[1]);
+    if (!style || !/^title$/i.test(style[1])) continue;
+    const text = textNodes(match[1]).join(' ').replace(/\s+/g, ' ').trim();
+    if (!text || TITLE_STOPWORDS.has(text.toLowerCase())) continue;
+    if (!looksLikeName(text)) continue;
+    const item = extractTypedValue('name', text);
+    if (item) typedValues.push({ original: item.original, type: item.type, key: 'Title', numeric: false });
+  }
 }
 
 /**
@@ -61,9 +99,11 @@ export function documentTables(xml) {
 export async function detectWithMeta(file) {
   const zip = await loadZip(file);
   const xml = await documentXml(zip, file);
-  const segments = textNodes(xml);
+  const parts = await textParts(zip);
+  const segments = parts.flatMap((part) => textNodes(part.xml));
   const typedValues = [];
   const moneyNumbers = [];
+  titleName(xml, typedValues);
 
   for (const rows of documentTables(xml)) {
     const headers = rows[0].map((cell) => classifyHeader(cell));
@@ -93,10 +133,16 @@ export async function detect(file) {
 
 export async function sanitize(file, entries) {
   const zip = await loadZip(file);
-  const xml = await documentXml(zip, file);
-  const updated = replaceTextNodes(xml, entries);
-  zip.file('word/document.xml', updated);
+  const parts = await textParts(zip);
+  let before = 0;
+  let after = 0;
+  for (const part of parts) {
+    const updated = replaceTextNodes(part.xml, entries);
+    before += part.xml.length;
+    after += updated.length;
+    zip.file(part.name, updated);
+  }
   const blob = await zip.generateAsync({ type: 'blob', mimeType: DOCX_MIME, compression: 'DEFLATE' });
-  console.log(`[DOCX Parser] ${file.name}: re-zipped document.xml (${xml.length} -> ${updated.length} chars).`);
+  console.log(`[DOCX Parser] ${file.name}: re-zipped ${parts.length} part(s) (${before} -> ${after} chars).`);
   return { blob, name: sanitizedName(file.name, 'docx') };
 }

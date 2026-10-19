@@ -22,24 +22,41 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
 
 ## Features
 
-- **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.json`, `.pdf` (25 MB per file).
+- **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.tsv`, `.json`, `.jsonl`/`.ndjson`,
+  `.pdf`, and the plain-text family (`.txt`, `.md`, `.log`, `.eml`, `.vcf`, `.ics`, `.xml`, `.html`)
+  — 25 MB per file.
 - **Rules engine:** toggle standard detectors — email, phone, SSN, Luhn-checked cards and
-  masked/last-four fragments, EIN tax IDs, IBANs (MOD-97), ABA routing numbers, bank
-  accounts, dates of birth, street addresses, IPs, passports, driver's licences,
-  passwords, API keys (OpenAI/AWS/GitHub/Slack/JWT) and user/transaction IDs — and add
-  your own secret keywords ("Project Phoenix", "Elon Musk", …).
+  masked/last-four fragments, EIN tax IDs,  IBANs (MOD-97), ABA routing numbers, bank accounts, dates of birth, street addresses, IPs,
+  passports, driver's licences, medical/insurance IDs (MRN, member, claim, NPI), profile URLs
+  and @handles, SWIFT/BIC codes, passwords, API keys (OpenAI/AWS/GitHub/Slack/JWT/Bearer) and
+  user/transaction IDs — and add your own secret keywords ("Project Phoenix", "Elon Musk", …).
 - **Context-aware typecasting:** a spreadsheet header (`Account Number`, `Balance`,
-  `Full Name`, `Date of Birth`) or a JSON key (`account_number`, `balance`, `ssn`) tells the
-  sanitizer what a bare value is. `4250` under `balance`, `884201553` under
-  `account_number` and `Jane Doe` under `Payee` are no longer invisible, and the same
-  value is replaced the same way in every uploaded file.
+  `Full Name`, `Date of Birth`), a JSON key (`account_number`, `balance`, `ssn`), a
+  `Label:` line, a Markdown pipe table or a vCard/iCalendar property tells the sanitizer
+  what a bare value is. `4250` under `balance`, `884201553` under `account_number`,
+  `MRN-77420` after `**MRN:**`, `user_id=USR-88213` in a log line and `Jane Doe` under
+  `Payee` are no longer invisible, and the same value is replaced the same way in every
+  uploaded file.
+- **Structure-aware text formats:** Markdown headings, bold labels and tables, email
+  headers/display names/signatures, `key=value` log fields, vCard `N`/`FN`/`ADR`/`BDAY`/`URL`
+  and iCalendar `ORGANIZER`/`ATTENDEE`/`LOCATION` are read as structure. Values split over
+  an iCalendar/vCard fold are rejoined, replaced and folded back to 75 characters, so the
+  calendar still parses and nothing is reflowed.
+- **People vs companies:** a `Payee`/`Customer` column is typed as a person or an
+  organisation from the value itself (`Whole Foods Market`, `City Power & Light`, `… LLC`),
+  so exports keep reading as invoices instead of a list of people. Column headers are never
+  rewritten, even when a payee contains the same word.
 - **Exact CSV handling:** CSV is read as UTF-8 text, so leading zeros in account numbers,
   non-ASCII names and quoted multi-line messages survive the round trip.
 - **Value jiggler:** monetary amounts (`$1,234.56`, `USD 2,000`, `5,000.00`, `1200.75`,
   including `-` and accounting `(…)` forms) are shifted by up to ±20% while keeping the
   currency mark, thousands separators, decimals and sign. Numeric JSON leaves stay numbers,
   and whole-dollar figures under a money-like key (`"balance": 4250`, `"amount": 3200`)
-  are shifted too, while counts, years and IDs are left alone.
+  are shifted too, while counts, years, timestamps and IDs are left alone. A currency code
+  never picks up the first number of the next line.
+- **Dates of birth:** the whole date is replaced with an unrelated adult birth date in the
+  original's written format (`04/17/1986`, `1986-04-17`, `April 17, 1986`, `17 April 1986`),
+  not just the year.
 - **Name variants:** a multi-word keyword like `John Smith` also redacts bare `John`,
   `Smith` and `JohnSmith`, each mapped to the matching token of the same fake name.
 - **Few false positives:** phone matching requires real separators, so transaction and
@@ -81,13 +98,23 @@ npm run build           # static output in dist/
 | `kyc-profile.docx` | labelled paragraphs + beneficiary table | names, passport, licence, DOB, address, income, table cells |
 | `statement.pdf` | text-layer statement | holder, account, address, transaction counterparties, balances, masked card |
 | `support-tickets.csv` | free-text inbox | PII inside sentences, labels, API keys, UTF-8 punctuation |
+| `payroll-register.tsv` | 14-column HR/payroll export | split first/last names, bare + dashed SSNs, month-name/ISO DOBs, bank accounts, salaries, phones in notes |
+| `crm-events.jsonl` | 4-event JSON Lines stream | nested contact object, `id`/`contact_id`, DOB, SSN, LinkedIn URL, money-keyed numbers, PII in a free-text note |
+| `support-thread.eml` | CRLF multipart email | quoted display names, From/To/Cc, signature name, masked card, SSN and DOB in prose, `tel:` link |
+| `contacts.vcf` | vCard 3.0 | structured `N` + `FN`, organisation, phone, birthday, home address, profile URL |
+| `team-calendar.ics` | folded iCalendar invite | organiser/attendee display names, location address, PII in a folded DESCRIPTION |
+| `patient-notes.md` | Markdown clinical note | bold label lines, heading name, pipe table, medical record/member IDs, payer, prose name reuse |
+| `access.log` | 6-line application log | IPs, `user_id=`, emails, bearer token, amounts, phone — with timestamps and status codes intact |
 
 `fixtures/manifest.json` lists every synthetic value that must not survive, with a text or
 numeric matcher. `src/lib/__tests__/fixtures.test.js` scans the whole corpus together
 (so cross-file consistency is testable), re-extracts each sanitized output, and fails on
-any surviving value. It also asserts structure was preserved: row counts, sheet names,
-`$#,##0.00` number formats, JSON types and keys, a valid DOCX table, PDF text labels, and
-the same fake account/card appearing in every file. Regenerating the corpus keeps the
+any surviving value. It also asserts structure was preserved: row counts and column widths,
+sheet names, `$#,##0.00` number formats, JSON types and keys, one JSON object per JSONL line,
+a valid DOCX table, PDF text labels, TSV tabs, MIME boundaries and both parts of the email,
+vCard property order and `N` components, calendar validity with every line ≤ 75 characters,
+Markdown headings/bold labels/table shape, untouched log timestamps and status codes, and the
+same fake account, card and person appearing in every file. Regenerating the corpus keeps the
 manifest in sync; replacements themselves are random per run.
 
 ## Deploy
@@ -110,14 +137,19 @@ manifest in sync; replacements themselves are random per run.
 ## Known limitations (V1)
 
 - An unlabelled person or company name in free prose is only caught when the same value is
-  established by another column, JSON key, table header or label in the session; there is no
-  general named-entity model. Add it as a custom keyword when it must be caught on its own.
+  established by another column, JSON key, table header, label or property in the session;
+  there is no general named-entity model. Add it as a custom keyword when it must be caught
+  on its own.
 - PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
-- DOCX replacement edits `word/document.xml` text nodes; PII split across multiple Word
-  runs may not be caught, and headers/footers are not scanned yet.
+- DOCX replacement edits `word/document.xml`, header, footer, note and comment text nodes;
+  PII split across multiple Word runs may not be caught.
+- `.eml` bodies are handled as 8-bit text: a quoted-printable or base64 part is not decoded,
+  so PII encoded as `=40`-style escapes would not match. Attachments are left as-is.
 - Advanced cell styling beyond number formats is not fully preserved by SheetJS.
 - The jiggler reads US-style amounts only (`1,234.56`, not `1.234,56`), treats bare integers as
   money only when a header/key says they are, and does not recompute totals or subtotals
   after a shift.
 - `state`/province abbreviations are intentionally left alone: two letters are too short to
   replace safely in free text.
+- Legacy binary Office files (`.doc`, `.xls` saved as BIFF) and images/OCR are not accepted;
+  export to `.docx`/`.xlsx` or a text format first.

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 *.log
+# the fixture corpus includes a synthetic application log
+!fixtures/*.log
 .env
 .env.*
 .DS_Store

@@ -1,0 +1,12 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Okafor;Nadia;Amara;;
+FN:Nadia Okafor
+ORG:Riverside Analytics
+TITLE:Head of Partnerships
+TEL;TYPE=CELL:+1 (617) 555-0110
+EMAIL;TYPE=WORK:nadia.okafor@riverside.example
+BDAY:1990-03-03
+ADR;TYPE=HOME:;;410 Maple Grove Avenue;Cambridge;MA;02139;USA
+URL:https://www.linkedin.com/in/nadiaokafor
+END:VCARD

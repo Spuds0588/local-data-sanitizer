@@ -15,21 +15,37 @@ const MONEY_WORDS = new Set([
 
 const NAME_WORDS = new Set([
   'name', 'payee', 'customer', 'employee', 'beneficiary', 'cardholder',
-  'applicant', 'contact', 'spouse', 'holder', 'employer', 'landlord', 'tenant',
-  'agent', 'assignee', 'representative',
+  'applicant', 'contact', 'spouse', 'holder', 'landlord', 'tenant',
+  'agent', 'assignee', 'representative', 'patient', 'insured', 'member',
+  'physician', 'provider', 'guardian', 'parent', 'witness', 'signatory',
+  'sender', 'recipient', 'attendee', 'organizer', 'author', 'buyer', 'seller',
+]);
+
+// These headers name an organisation, not a person. Replacing "Northwind
+// Traders" with a person's name makes a payroll or CRM export read wrong.
+const ORG_WORDS = new Set([
+  'company', 'employer', 'organization', 'organisation', 'org', 'vendor',
+  'supplier', 'contractor', 'firm', 'agency', 'business', 'facility',
+  'clinic', 'hospital', 'laboratory', 'practice', 'payer', 'insurer',
+  'carrier', 'broker', 'landlord', 'university', 'school',
+]);
+
+const NAME_STOPWORDS = new Set([
+  'n/a', 'na', 'none', 'null', 'unknown', 'test', 'admin', 'system', 'user',
+  'customer', 'guest', 'tbd', 'name', 'true', 'false', 'deleted',
 ]);
 
 const ID_OWNERS = new Set([
   'user', 'customer', 'member', 'employee', 'client', 'account', 'transaction',
   'txn', 'reference', 'ref', 'confirmation', 'ticket', 'record', 'patient',
-  'student', 'policy', 'order',
+  'student', 'policy', 'order', 'contact', 'lead', 'vendor', 'candidate',
+  'subscriber', 'household', 'device', 'session', 'event', 'case',
 ]);
 
 const CONNECTORS = new Set(['&', 'of', 'the', 'and', 'for']);
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 const PHONE_RE = /^\+?\d{0,3}[\s.-]?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}$/;
-const SSN_RE = /^\d{3}-\d{2}-\d{4}$/;
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
 /** Split a key/header into lowercase words, including camelCase boundaries. */
@@ -54,19 +70,42 @@ export function classifyHeader(header) {
   const hasId = has('id') || has('number') || has('no') || has('num') || has('code');
 
   if (has('email') || has('mail')) return 'email';
-  if (has('phone') || has('mobile') || has('tel') || has('telephone') || has('cell')) return 'phone';
-  if (joined.includes('ssn') || joined.includes('socialsecurity')) return 'ssn';
+  if (has('phone') || has('mobile') || has('tel') || has('telephone') || has('cell') || has('fax')) return 'phone';
+  if (joined.includes('ssn') || joined.includes('socialsecurity')) {
+    return has('last') || has('four') || has('partial') || joined.includes('ssn4') ? 'ssnPartial' : 'ssn';
+  }
   if (has('dob') || (has('birth') && has('date')) || joined === 'birthdate' || has('born')) return 'dob';
   if (has('iban')) return 'iban';
   if (has('routing') || has('aba') || has('rtn')) return 'routing';
+  if (has('swift') || has('bic')) return 'swiftBic';
+
+  // Health-plan identifiers first: "Member ID" and "Claim Number" are medical
+  // IDs, not generic record keys.
+  if (
+    has('mrn') ||
+    joined.includes('medicalrecord') ||
+    (has('medical') && hasId) ||
+    (has('member') && hasId) ||
+    (has('group') && hasId) ||
+    (has('policy') && hasId) ||
+    (has('claim') && hasId) ||
+    has('npi') ||
+    has('dea')
+  ) {
+    return 'medicalId';
+  }
 
   // "Account Holder" is a person; "Account Number"/"Account" is the number.
   if (has('account') || has('acct')) {
     if (has('holder')) return 'name';
     if (has('id') && !has('number') && !has('no') && !has('num')) return 'recordId';
-    if (hasId || words.length === 1) return 'account';
+    // "Bank Account" / "Checking Account" name the number; "Account Manager"
+    // does not.
+    if (hasId || words.length === 1 || has('bank') || has('checking') || has('savings')) return 'account';
   }
-  if (has('card') || has('cc') || has('pan')) return 'card';
+  if (has('card') || has('cc') || has('pan')) {
+    return has('last') || has('four') || joined.includes('last4') ? 'creditCardPartial' : 'card';
+  }
   if ((has('tax') && has('id')) || has('ein') || has('tin')) return 'taxId';
   if (has('passport')) return 'passport';
   if (has('license') || has('licence') || has('dl')) return 'license';
@@ -81,37 +120,132 @@ export function classifyHeader(header) {
   if (has('city') || has('town')) return 'city';
   // A two-letter state is too short to replace safely as free text; it stays.
   if (has('postal') || has('zip') || has('postcode')) return 'postalCode';
-  // IDs before names: "Customer ID" is not a customer name.
-  if (has('id') && ID_OWNERS.has(words[0])) return 'recordId';
+  // IDs before names: "Customer ID" is not a customer name. A bare `id` key is
+  // the commonest identifier in a JSON API / event stream.
+  if (has('id') && (words.length === 1 || ID_OWNERS.has(words[0]))) return 'recordId';
   if (ID_OWNERS.has(joined) && ['reference', 'ref', 'ticket', 'transaction', 'txn', 'confirmation'].some((w) => joined.includes(w))) {
     return 'recordId';
   }
+  // "Vendor Contact" is a person even though "Vendor" alone is a company.
+  if (has('contact')) return 'name';
+  // A profile URL/handle carries a real person's name in its path.
+  if (
+    !has('name') &&
+    (has('linkedin') || has('github') || has('twitter') || has('handle') || has('username') || has('profile'))
+  ) {
+    return 'profileUrl';
+  }
+  if (words.some((word) => ORG_WORDS.has(word))) return 'organization';
   if (words.some((word) => NAME_WORDS.has(word))) return 'name';
   if (words.some((word) => MONEY_WORDS.has(word))) return 'amount';
   return null;
 }
 
-/** A plausible human/organization name: 2-5 capitalized tokens, no digits. */
+// Unicode-aware so accented and non-Latin names survive typing instead of
+// falling through to the regex detectors (which are ASCII-only).
+const NAME_TOKEN_RE = /^[\p{L}][\p{L}'’.-]*$/u;
+const NAME_START_RE = /^\p{Lu}/u;
+const NAME_PARTICLES = new Set([
+  'de', 'la', 'le', 'van', 'von', 'der', 'den', 'da', 'di', 'del', 'bin',
+  'al', 'el', 'y', 'e', 'dos', 'das',
+]);
+
+function isNameToken(token) {
+  if (CONNECTORS.has(token.toLowerCase()) || NAME_PARTICLES.has(token.toLowerCase())) return true;
+  return NAME_TOKEN_RE.test(token) && NAME_START_RE.test(token);
+}
+
+/**
+ * A plausible human name. Covers a single token (a split First/Last Name
+ * column), the CRM "Doe, Jane" form, all-caps mainframe exports, and accented
+ * letters. Digits, emails and URLs are never names.
+ */
 export function looksLikeName(text) {
-  const tokens = String(text).trim().split(/\s+/);
-  if (tokens.length < 2 || tokens.length > 5) return false;
-  if (/\d/.test(text)) return false;
-  return tokens.every(
-    (token) =>
-      /^[A-Za-z&'’.-]+$/.test(token) &&
-      (CONNECTORS.has(token.toLowerCase()) || /^[A-Z]/.test(token)),
-  );
+  const value = String(text ?? '').trim();
+  if (!value || value.length > 80) return false;
+  if (/[@\d]/.test(value) || /^https?:/i.test(value)) return false;
+
+  const comma = /^([\p{L}][\p{L}'’.-]*),\s*([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,3})$/u.exec(value);
+  if (comma) {
+    const tokens = [comma[1], ...comma[2].split(/\s+/)];
+    return tokens.length <= 5 && tokens.every(isNameToken);
+  }
+
+  const tokens = value.split(/\s+/);
+  if (tokens.length > 5) return false;
+  if (tokens.length === 1) {
+    return isNameToken(tokens[0]) && tokens[0].length >= 2 && !NAME_STOPWORDS.has(tokens[0].toLowerCase());
+  }
+  return tokens.every(isNameToken);
+}
+
+// Words that make a capitalised multi-word value read as a business rather than
+// a person. "Payee" columns are full of both, and turning "City Power & Light"
+// into a person's name (then deriving "City" from it) corrupts the document.
+const COMPANY_HINTS = new Set([
+  'bank', 'market', 'foods', 'food', 'corporation', 'corp', 'company', 'co',
+  'properties', 'property', 'dental', 'health', 'healthcare', 'insurance',
+  'power', 'light', 'energy', 'services', 'service', 'group', 'partners',
+  'holdings', 'capital', 'media', 'systems', 'solutions', 'technologies',
+  'technology', 'labs', 'laboratory', 'studio', 'cafe', 'restaurant', 'hotel',
+  'store', 'shop', 'trust', 'fund', 'associates', 'consulting', 'analytics',
+  'logistics', 'industries', 'manufacturing', 'motors', 'airlines', 'railway',
+  'university', 'school', 'clinic', 'hospital', 'pharmacy', 'supply', 'supplies',
+  'inc', 'llc', 'ltd', 'plc', 'llp', 'gmbh', 'ventures', 'enterprises', 'works',
+]);
+
+/** A capitalised value that names a business rather than a person. */
+export function looksLikeCompany(text) {
+  const value = String(text ?? '').trim();
+  if (!value || /[@\d]/.test(value)) return false;
+  if (/\s&\s/.test(value)) return true;
+  const words = value.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  return words.some((word) => COMPANY_HINTS.has(word));
+}
+
+/** A company/organisation value: at least one letter, no contact details. */
+export function looksLikeOrganization(text) {
+  const value = String(text ?? '').trim();
+  if (!value || value.length > 100) return false;
+  if (/@/.test(value) || /^https?:/i.test(value)) return false;
+  return /\p{L}/u.test(value) && !NAME_STOPWORDS.has(value.toLowerCase());
 }
 
 function digitsOnly(value) {
   return String(value).replace(/\D/g, '');
 }
 
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+const MONTHS = new Map();
+MONTH_NAMES.forEach((name, i) => {
+  MONTHS.set(name, i + 1);
+  MONTHS.set(name.slice(0, 3), i + 1);
+});
+MONTHS.set('sept', 9);
+
+function monthNumber(name) {
+  return MONTHS.get(String(name).toLowerCase().replace(/\.$/, '')) || 0;
+}
+
 export function parseDateParts(text) {
-  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text).trim());
+  const value = String(text).trim();
+  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (match) return { year: +match[1], month: +match[2], day: +match[3], format: 'iso' };
-  match = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(String(text).trim());
+  match = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(value);
   if (match) return { year: +match[3], month: +match[1], day: +match[2], format: 'us' };
+  // "April 17, 1986" / "Apr 17 1986" / "17 April 1986" — common in free text
+  // and in DOCX paragraphs, where spreadsheets would store a real date cell.
+  match = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(value);
+  if (match && monthNumber(match[1])) {
+    return { year: +match[3], month: monthNumber(match[1]), day: +match[2], format: 'month-name', dayFirst: false, monthStyle: match[1].length <= 4 ? 'short' : 'long' };
+  }
+  match = /^(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})$/.exec(value);
+  if (match && monthNumber(match[2])) {
+    return { year: +match[3], month: monthNumber(match[2]), day: +match[1], format: 'month-name', dayFirst: true, monthStyle: match[2].length <= 4 ? 'short' : 'long' };
+  }
   return null;
 }
 
@@ -151,8 +285,35 @@ export function extractTypedValue(type, raw, opts = {}) {
         ? { original: text, type }
         : null;
     }
-    case 'ssn':
-      return SSN_RE.test(text) ? { original: text, type } : null;
+    case 'ssn': {
+      if (!/^\d{3}-?\d{2}-?\d{4}$/.test(text)) return null;
+      const digits = digitsOnly(text);
+      const area = Number(digits.slice(0, 3));
+      // 000/666/9xx are not issued; all-zero group/serial are placeholders.
+      if (!area || area === 666 || area >= 900) return null;
+      if (digits.slice(3, 5) === '00' || digits.slice(5) === '0000') return null;
+      return { original: text, type };
+    }
+    case 'ssnPartial': {
+      // A masked SSN or a bare last-four under a "SSN last 4" header.
+      if (/^\d{4}$/.test(text) || /\d{4}(?!.*\d)/.test(text)) return { original: text, type };
+      return null;
+    }
+    case 'medicalId': {
+      return text.length >= 5 && text.length <= 30 && /\d/.test(text) && /^[A-Za-z0-9][A-Za-z0-9 -]*$/.test(text)
+        ? { original: text, type }
+        : null;
+    }
+    case 'swiftBic':
+      return /^[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/.test(text) ? { original: text, type } : null;
+    case 'profileUrl': {
+      if (/^@[A-Za-z0-9_.]{3,30}$/.test(text)) return { original: text, type };
+      if (/^(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/in|github\.com|twitter\.com|x\.com)\/[A-Za-z0-9._%-]+$/i.test(text)) {
+        return { original: text, type };
+      }
+      if (/^[A-Za-z0-9._-]{3,30}$/.test(text) && !/^\d+$/.test(text)) return { original: text, type };
+      return null;
+    }
     case 'iban':
       return ibanValid(text) ? { original: text, type } : null;
     case 'routing':
@@ -172,6 +333,9 @@ export function extractTypedValue(type, raw, opts = {}) {
       if (/\d{4}/.test(text) && /[*xX•·]/.test(text)) return { original: text, type: 'creditCardPartial' };
       return null;
     }
+    case 'creditCardPartial': {
+      return /^\d{4}$/.test(text) || /\d{4}(?!.*\d)/.test(text) ? { original: text, type } : null;
+    }
     case 'amount': {
       const parsed = parseAmount(text);
       if (parsed) return parsed.value === 0 ? null : { original: text, type };
@@ -181,7 +345,14 @@ export function extractTypedValue(type, raw, opts = {}) {
       return null;
     }
     case 'name':
-      return looksLikeName(text) ? { original: text, type } : null;
+      if (!looksLikeName(text)) return null;
+      // "Payee" / "Customer" columns hold companies too; a company keeps its
+      // shape (and its legal suffix) instead of becoming a person.
+      return looksLikeCompany(text)
+        ? { original: text, type: 'organization' }
+        : { original: text, type };
+    case 'organization':
+      return looksLikeOrganization(text) ? { original: text, type } : null;
     case 'dob': {
       const parts = parseDateParts(text);
       return isRealDate(parts) ? { original: text, type } : null;
@@ -198,8 +369,10 @@ export function extractTypedValue(type, raw, opts = {}) {
       return /^[A-Z]{2}$/.test(text) ? { original: text, type } : null;
     case 'postalCode':
       return /^\d{5}(?:-\d{4})?$/.test(text) ? { original: text, type } : null;
-    case 'taxId':
-      return einValid(text) ? { original: text, type } : null;
+    case 'taxId': {
+      const match = /^(\d{2})-?(\d{7})$/.exec(text);
+      return match && einValid(`${match[1]}-${match[2]}`) ? { original: text, type } : null;
+    }
     case 'passport':
       return /^[A-Z0-9]{8,9}$/.test(text) && /\d/.test(text) ? { original: text, type } : null;
     case 'license':
@@ -210,10 +383,14 @@ export function extractTypedValue(type, raw, opts = {}) {
       return text.length >= 6 && !/\s/.test(text) ? { original: text, type } : null;
     case 'apiKey':
       return text.length >= 12 && /^[A-Za-z0-9_\-./+=]+$/.test(text) ? { original: text, type } : null;
-    case 'recordId':
-      return /^[A-Za-z]{1,6}[-_ ]?\d{3,}$/.test(text) || (/^[A-Za-z0-9]{6,20}$/.test(text) && /\d/.test(text))
-        ? { original: text, type }
-        : null;
+    case 'recordId': {
+      // EMP-2041, MRN-88213, HP-99281-04, TXN_88213 and bare numeric IDs.
+      const shaped =
+        /^[A-Za-z]{1,8}[-_ ]?\d{3,}(?:[-_]\d+)*$/.test(text) ||
+        /^[A-Za-z0-9][A-Za-z0-9_-]{5,24}$/.test(text) ||
+        /^\d{4,20}$/.test(text);
+      return shaped && /\d/.test(text) ? { original: text, type } : null;
+    }
     default:
       return null;
   }

@@ -310,7 +310,7 @@ const pdfLines = [
   'Statement Period: 2024-01-01 to 2024-01-31',
   'Opening Balance: $4,850.00',
   '01/03 TRANSFER TO JANE DOE -$750.00 Balance $4,100.00',
-  '01/05 POS PURCHASE WHOLE FOODS #1042 -$128.45 Balance $3,971.55',
+  '01/05 POS PURCHASE WHOLE FOODS MARKET #1042 -$128.45 Balance $3,971.55',
   '01/10 TRANSFER FROM ROBERT CHEN $300.00 Balance $2,071.55',
   '01/18 PAYROLL ACME CORPORATION $1,250.00 Balance $3,006.80',
   '01/26 TRANSFER TO PRIYA NATARAJAN -$500.00 Balance $4,270.60',
@@ -399,6 +399,208 @@ addFile('support-tickets.csv', [
   text('Dana Whitfield'), text('Luis Ortega'),
 ]);
 
+// -------------------------------------------------------- payroll register (TSV)
+// A tab-separated HR/payroll export: split first/last name columns, bare SSNs,
+// month-name and ISO dates, and the only phone number buried in a note.
+const payrollRows = [
+  ['Employee ID', 'First Name', 'Last Name', 'Work Email', 'SSN', 'Date of Birth', 'Home Address', 'City', 'State', 'ZIP', 'Bank Account', 'Routing Number', 'Annual Salary', 'Notes'],
+  ['EMP-2041', 'Elena', 'Vasquez', 'elena.vasquez@northwind.example', '412887315', 'April 17, 1986', '1187 Juniper Way', 'Boise', 'ID', '83702', '441900273', '021000021', '85000', 'Emergency contact: Rosa Vasquez, 208-555-0141'],
+  ['EMP-2042', 'Tomas', 'Brandt', 'tomas.brandt@northwind.example', '508-63-9917', '11/02/1979', '44 Alder Court', 'Austin', 'TX', '78701', '603118452', '325081403', '92000', 'Reach Tomas at 512-555-0188'],
+  ['EMP-2043', 'Aisha', 'Rahman', 'aisha.rahman@northwind.example', '627449018', '1992-08-23', '902 Birch Street', 'Denver', 'CO', '80202', '771904326', '021000021', '118000', 'Payroll contact: Dana Whitfield'],
+];
+
+const payrollSecrets = payrollRows.slice(1).flatMap((row) => [
+  text(row[0]), text(row[1]), text(row[2]), text(`${row[1]} ${row[2]}`), text(row[3]),
+  text(row[4]), text(row[5]), text(row[6]), text(row[7]), text(row[9]),
+  text(row[10]), text(row[11]), number(row[12]),
+]);
+addFile('payroll-register.tsv', [
+  ...payrollSecrets,
+  text('Rosa Vasquez'), text('208-555-0141'), text('512-555-0188'), text('Dana Whitfield'),
+]);
+
+// ------------------------------------------------------------- CRM event stream (JSONL)
+const crmContact = {
+  id: 'CNT-5521',
+  full_name: 'Nadia Okafor',
+  first_name: 'Nadia',
+  last_name: 'Okafor',
+  email: 'nadia.okafor@riverside.example',
+  phone: '+1 (617) 555-0110',
+  date_of_birth: 'March 3, 1990',
+  ssn: '219-88-4433',
+  company: 'Riverside Analytics',
+  linkedin: 'https://www.linkedin.com/in/nadiaokafor',
+  address: { line1: '410 Maple Grove Avenue', city: 'Cambridge', state: 'MA', postal_code: '02139' },
+  credit_limit: 18000,
+  balance: 0,
+};
+
+const crmLines = [
+  { event: 'contact.created', at: '2024-02-05T11:02:00Z', actor: 'Dana Whitfield', contact: crmContact },
+  {
+    event: 'note.added',
+    at: '2024-02-05T11:09:00Z',
+    contact_id: 'CNT-5521',
+    author: 'Dana Whitfield',
+    body: 'Left voicemail on 617-555-0110. Backup number 617-555-0199. SSN on file 219-88-4433.',
+  },
+  { event: 'deal.updated', at: '2024-02-06T08:31:00Z', contact_id: 'CNT-5521', amount: 4800, stage: 'negotiation' },
+  { event: 'contact.updated', at: '2024-02-06T08:33:00Z', contact_id: 'CNT-5521', field: 'balance', balance: 4250 },
+];
+
+addFile('crm-events.jsonl', [
+  text(crmContact.id), text(crmContact.full_name), text(crmContact.first_name), text(crmContact.last_name),
+  text(crmContact.email), text(crmContact.phone), text(crmContact.date_of_birth), text(crmContact.ssn),
+  text(crmContact.company), text(crmContact.linkedin), text(crmContact.address.line1),
+  text(crmContact.address.city), text(crmContact.address.postal_code), number(crmContact.credit_limit),
+  text('Dana Whitfield'), text('617-555-0110'), text('617-555-0199'), number(4800), number(4250),
+]);
+
+// ------------------------------------------------------------- email thread (.eml)
+// CRLF + multipart boundaries: the sanitizer must not reflow or re-encode it.
+const eml = [
+  'From: "Camille Dubois" <camille.dubois@northwind.example>',
+  'To: "Priya Natarajan" <priya.n@example.com>',
+  'Cc: Marcus Webb <marcus.webb@example.com>',
+  'Subject: Re: refund for card ending in 4021',
+  'Date: Tue, 06 Feb 2024 09:14:00 +0000',
+  'MIME-Version: 1.0',
+  'Content-Type: multipart/alternative; boundary="----=_Part_1234"',
+  '',
+  '------=_Part_1234',
+  'Content-Type: text/plain; charset="utf-8"',
+  '',
+  'Hi Priya,',
+  '',
+  'The refund for the card ending in 4021 is on its way. I can be reached at',
+  '617-555-0110 or camille.dubois@northwind.example. My SSN is 684-77-2109 and my',
+  'date of birth is 07/09/1984.',
+  '',
+  'Please post the cheque to 85 Harbor View Road, Portland, ME 04101.',
+  '',
+  'Thanks,',
+  'Camille Dubois',
+  '------=_Part_1234',
+  'Content-Type: text/html; charset="utf-8"',
+  '',
+  '<html><body><p>Hi Priya,</p><p>Call <a href="tel:617-555-0110">617-555-0110</a> or email',
+  'camille.dubois@northwind.example.</p><p>Thanks,<br>Camille Dubois</p></body></html>',
+  '------=_Part_1234--',
+  '',
+].join('\r\n');
+
+addFile('support-thread.eml', [
+  text('Camille Dubois'), text('camille.dubois@northwind.example'),
+  text('Priya Natarajan'), text('priya.n@example.com'),
+  text('Marcus Webb'), text('marcus.webb@example.com'),
+  text('ending in 4021'), text('617-555-0110'),
+  text('684-77-2109'), text('07/09/1984'),
+  text('85 Harbor View Road, Portland, ME 04101'),
+]);
+
+// ---------------------------------------------------------------- contacts (.vcf)
+const vcf = [
+  'BEGIN:VCARD',
+  'VERSION:3.0',
+  'N:Okafor;Nadia;Amara;;',
+  'FN:Nadia Okafor',
+  'ORG:Riverside Analytics',
+  'TITLE:Head of Partnerships',
+  'TEL;TYPE=CELL:+1 (617) 555-0110',
+  'EMAIL;TYPE=WORK:nadia.okafor@riverside.example',
+  'BDAY:1990-03-03',
+  'ADR;TYPE=HOME:;;410 Maple Grove Avenue;Cambridge;MA;02139;USA',
+  'URL:https://www.linkedin.com/in/nadiaokafor',
+  'END:VCARD',
+  '',
+].join('\r\n');
+
+addFile('contacts.vcf', [
+  text('Nadia Okafor'), text('Okafor'), text('Nadia'), text('Amara'),
+  text('Riverside Analytics'), text('+1 (617) 555-0110'),
+  text('nadia.okafor@riverside.example'), text('1990-03-03'),
+  text('410 Maple Grove Avenue'), text('Cambridge'), text('02139'),
+  text('https://www.linkedin.com/in/nadiaokafor'),
+]);
+
+// ------------------------------------------------------------- calendar invite (.ics)
+const ics = [
+  'BEGIN:VCALENDAR',
+  'VERSION:2.0',
+  'PRODID:-//Northwind//Calendar//EN',
+  'BEGIN:VEVENT',
+  'UID:7f2c1d9e-4a6b-4c8d-9e0f-1a2b3c4d5e6f',
+  'DTSTAMP:20240201T090000Z',
+  'DTSTART:20240315T140000Z',
+  'DTEND:20240315T150000Z',
+  'SUMMARY:Benefits review with Camille Dubois',
+  'ORGANIZER;CN=Camille Dubois:mailto:camille.dubois@northwind.example',
+  'ATTENDEE;CN=Nadia Okafor;ROLE=REQ-PARTICIPANT:mailto:nadia.okafor@riverside.example',
+  'LOCATION:410 Maple Grove Avenue, Cambridge, MA 02139',
+  'DESCRIPTION:Call 617-555-0110 for the dial-in. Questions to camille.dubois@northwind\r\n .example.',
+  'END:VEVENT',
+  'END:VCALENDAR',
+  '',
+].join('\r\n');
+
+addFile('team-calendar.ics', [
+  text('Camille Dubois'), text('camille.dubois@northwind.example'),
+  text('Nadia Okafor'), text('nadia.okafor@riverside.example'),
+  text('410 Maple Grove Avenue, Cambridge, MA 02139'), text('617-555-0110'),
+]);
+
+// ------------------------------------------------------- patient notes (.md)
+const markdown = [
+  '# Patient: Aisha Rahman',
+  '',
+  '**MRN:** MRN-77420',
+  '**Member ID:** HP-44821-07',
+  '**Date of birth:** January 30, 1988',
+  '**Phone:** (303) 555-0164',
+  '**Email:** aisha.rahman@example.org',
+  '**Address:** 902 Birch Street, Denver, CO 80202',
+  '**Payer:** BlueRidge Health Plan',
+  '**Primary care:** Dana Whitfield',
+  '',
+  '## Visit summary',
+  '',
+  'Aisha presented for a routine follow-up. Insurance is billed through BlueRidge Health Plan.',
+  '',
+  '| Visit date | Physician | MRN | Diagnosis |',
+  '| --- | --- | --- | --- |',
+  '| 2024-01-09 | Dana Whitfield | MRN-77420 | J06.9 |',
+  '| 2024-01-23 | Dana Whitfield | MRN-77420 | Z00.00 |',
+  '',
+  'Refer billing questions to billing@blueridge.example or call (303) 555-0164.',
+  '',
+].join('\n');
+
+addFile('patient-notes.md', [
+  text('Aisha Rahman'), text('Aisha'), text('MRN-77420'), text('HP-44821-07'),
+  text('January 30, 1988'), text('(303) 555-0164'), text('aisha.rahman@example.org'),
+  text('902 Birch Street, Denver, CO 80202'), text('BlueRidge Health Plan'),
+  text('Dana Whitfield'), text('billing@blueridge.example'),
+]);
+
+// ------------------------------------------------------------- application log (.log)
+const accessLog = [
+  '203.0.113.77 - - [03/Feb/2024:14:22:00 +0000] "POST /api/login HTTP/1.1" 200 512 "-" "Mozilla/5.0"',
+  '2024-02-03T14:22:05Z WARN auth user_id=USR-88213 email=nadia.okafor@riverside.example ip=198.51.100.17 status=ok',
+  '2024-02-03T14:22:09Z INFO transfer user_id=USR-88213 amount=1250.00 currency=USD',
+  '2024-02-03T14:22:11Z ERROR api call failed reason=expired_token',
+  '2024-02-03T14:22:12Z ERROR api retry Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJVU1ItODgyMTMifQ.7xQ2m9pL0vR4sT8wY1zA6bC3dE5f',
+  '2024-02-03T14:23:40Z INFO contact phone=(617)555-0110 owner=nadia.okafor@riverside.example',
+  '',
+].join('\n');
+
+addFile('access.log', [
+  text('203.0.113.77'), text('USR-88213'), text('nadia.okafor@riverside.example'),
+  text('198.51.100.17'), number('1250.00'),
+  text('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJVU1ItODgyMTMifQ.7xQ2m9pL0vR4sT8wY1zA6bC3dE5f'),
+  text('(617)555-0110'),
+]);
+
 // --------------------------------------------------------------------- write
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(path.join(OUT, 'bank-transactions.csv'), csv(bankRows));
@@ -407,6 +609,16 @@ await fs.writeFile(path.join(OUT, 'user-export.json'), JSON.stringify({ export_v
 await fs.writeFile(path.join(OUT, 'kyc-profile.docx'), await docxBuffer());
 await fs.writeFile(path.join(OUT, 'statement.pdf'), pdfBuffer(pdfLines));
 await fs.writeFile(path.join(OUT, 'support-tickets.csv'), csv(supportRows));
+await fs.writeFile(
+  path.join(OUT, 'payroll-register.tsv'),
+  payrollRows.map((row) => row.join('\t')).join('\n') + '\n',
+);
+await fs.writeFile(path.join(OUT, 'crm-events.jsonl'), crmLines.map((line) => JSON.stringify(line)).join('\n') + '\n');
+await fs.writeFile(path.join(OUT, 'support-thread.eml'), eml);
+await fs.writeFile(path.join(OUT, 'contacts.vcf'), vcf);
+await fs.writeFile(path.join(OUT, 'team-calendar.ics'), ics);
+await fs.writeFile(path.join(OUT, 'patient-notes.md'), markdown);
+await fs.writeFile(path.join(OUT, 'access.log'), accessLog);
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
 for (const file of manifest.files) {

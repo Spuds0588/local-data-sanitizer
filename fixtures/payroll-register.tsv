@@ -1,0 +1,4 @@
+Employee ID	First Name	Last Name	Work Email	SSN	Date of Birth	Home Address	City	State	ZIP	Bank Account	Routing Number	Annual Salary	Notes
+EMP-2041	Elena	Vasquez	elena.vasquez@northwind.example	412887315	April 17, 1986	1187 Juniper Way	Boise	ID	83702	441900273	021000021	85000	Emergency contact: Rosa Vasquez, 208-555-0141
+EMP-2042	Tomas	Brandt	tomas.brandt@northwind.example	508-63-9917	11/02/1979	44 Alder Court	Austin	TX	78701	603118452	325081403	92000	Reach Tomas at 512-555-0188
+EMP-2043	Aisha	Rahman	aisha.rahman@northwind.example	627449018	1992-08-23	902 Birch Street	Denver	CO	80202	771904326	021000021	118000	Payroll contact: Dana Whitfield

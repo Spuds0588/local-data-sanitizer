@@ -1,0 +1,16 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Northwind//Calendar//EN
+BEGIN:VEVENT
+UID:7f2c1d9e-4a6b-4c8d-9e0f-1a2b3c4d5e6f
+DTSTAMP:20240201T090000Z
+DTSTART:20240315T140000Z
+DTEND:20240315T150000Z
+SUMMARY:Benefits review with Camille Dubois
+ORGANIZER;CN=Camille Dubois:mailto:camille.dubois@northwind.example
+ATTENDEE;CN=Nadia Okafor;ROLE=REQ-PARTICIPANT:mailto:nadia.okafor@riverside.example
+LOCATION:410 Maple Grove Avenue, Cambridge, MA 02139
+DESCRIPTION:Call 617-555-0110 for the dial-in. Questions to camille.dubois@northwind
+ .example.
+END:VEVENT
+END:VCALENDAR

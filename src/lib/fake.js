@@ -33,9 +33,13 @@ function scrambleDigits(original) {
       out += ch;
     }
   }
-  // Keep a leading zero (and the original width) intact; a zero-width change is
-  // still a change if the value itself had none.
-  return changed ? out : original.replace(/\d/g, () => String(randomDigit()));
+  // Keep the original width; a zero-width change is still a change if the value
+  // itself had none.
+  if (!changed) out = String(original).replace(/\d/g, () => String(randomDigit()));
+  // A leading zero is preserved. A number that never had one must not gain one:
+  // a JSON numeric account (884201553) would silently lose a digit on write.
+  if (String(original)[0] !== '0' && out[0] === '0') out = `${1 + (randomDigit() % 9)}${out.slice(1)}`;
+  return out;
 }
 
 /** Collapse faker retries so a fake never equals the original or another fake. */
@@ -48,27 +52,76 @@ function retry(original, build, accept = () => true) {
   return candidate;
 }
 
-/** \"John Smith\" -> another two-token name, with no token reused from the original. */
+const NAME_TITLES = new Set(['dr', 'dr.', 'mr', 'mr.', 'ms', 'ms.', 'mrs', 'mrs.', 'prof', 'prof.', 'rev', 'rev.', 'sir', 'madam']);
+const NAME_SUFFIXES = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'phd', 'md', 'esq', 'esq.', 'cpa']);
+const NAME_PARTICLES = new Set(['de', 'la', 'le', 'van', 'von', 'der', 'den', 'da', 'di', 'del', 'bin', 'al', 'el', 'y', 'e', 'dos', 'das']);
+const norm = (token) => String(token).toLowerCase().replace(/,$/, '');
+const isKeptNameToken = (token) =>
+  NAME_TITLES.has(norm(token)) || NAME_SUFFIXES.has(norm(token)) || NAME_PARTICLES.has(norm(token));
+
+/**
+ * "John Smith" -> another two-token name, with no name word reused from the
+ * original. Titles, suffixes and particles ("Dr.", "Jr.", "van der") are kept
+ * so a resume or legal document still reads like one. The CRM "Doe, Jane"
+ * form keeps its comma and order.
+ */
 function fakeName(original) {
-  const tokens = String(original).trim().split(/\s+/);
-  const originalTokens = new Set(tokens.map((token) => token.toLowerCase()));
+  const value = String(original).trim();
+  const originalTokens = new Set(value.split(/\s+/).map(norm));
+
   const build = () => {
-    const parts = [];
-    const last = tokens.length - 1;
-    for (let i = 0; i < tokens.length; i += 1) {
-      if (i === 0) parts.push(faker.person.firstName());
-      else if (i === last) parts.push(faker.person.lastName());
-      else parts.push(faker.person.middleName());
-    }
-    return parts.join(' ');
+    const comma = /^([^,]+),\s*(.+)$/.exec(value);
+    const groups = comma ? [comma[1].trim(), comma[2].trim()] : [value];
+    const rendered = groups.map((group, groupIndex) => {
+      const tokens = group.split(/\s+/);
+      const nameCount = tokens.filter((token) => !isKeptNameToken(token)).length;
+      let seen = 0;
+      return tokens
+        .map((token) => {
+          if (isKeptNameToken(token)) return token;
+          seen += 1;
+          // In "Doe, Jane" the first group is the surname.
+          if (comma) return groupIndex === 0 ? faker.person.lastName() : seen === 1 ? faker.person.firstName() : faker.person.middleName();
+          if (seen === 1) return faker.person.firstName();
+          if (seen === nameCount) return faker.person.lastName();
+          return faker.person.middleName();
+        })
+        .join(' ');
+    });
+    return comma ? `${rendered[0]}, ${rendered[1]}` : rendered[0];
   };
+
   return retry(
     original,
     build,
     (candidate) =>
-      candidate.trim().split(/\s+/).every((token) => !originalTokens.has(token.toLowerCase())) &&
-      candidate.trim().split(/\s+/).length === tokens.length,
+      candidate.trim().split(/\s+/).length === value.split(/\s+/).length &&
+      candidate
+        .trim()
+        .split(/\s+/)
+        .every((token) => isKeptNameToken(token) || !originalTokens.has(norm(token))),
   );
+}
+
+/** A fake company keeps the legal suffix (LLC, Inc) of the original. */
+function fakeOrganization(original) {
+  const suffix = /\b(LLC|L\.L\.C\.|Inc\.?|Corp\.?|Corporation|Ltd\.?|Limited|PLC|GmbH|Co\.?)\s*$/i.exec(String(original));
+  const base = faker.company.name().replace(/\s*(LLC|Inc\.?|Corp\.?|Corporation|Ltd\.?|Limited|PLC|Group)\s*$/i, '');
+  return suffix ? `${base} ${suffix[1]}` : base;
+}
+
+function fakeProfileUrl(original) {
+  const username = () =>
+    faker.internet
+      .username()
+      .replace(/[^A-Za-z0-9._-]/g, '')
+      .slice(0, 24) || 'quietuser';
+  const value = String(original);
+  if (value.startsWith('@')) return `@${username()}`;
+  if (/^(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/in|github\.com|twitter\.com|x\.com)\//i.test(value)) {
+    return value.replace(/[A-Za-z0-9._%-]+$/, username());
+  }
+  return username();
 }
 
 /** \"742 Evergreen Terrace, Springfield, IL 62704\" -> a new full address. */
@@ -98,12 +151,29 @@ function fakeRouting(original) {
   return `${firstEight}${abaCheckDigit(firstEight)}`;
 }
 
+const MONTH_LONG = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const MONTH_SHORT = MONTH_LONG.map((name) => name.slice(0, 3));
+
 function fakeDob(original) {
   const parts = parseDateParts(original);
   if (!parts) return '1985-06-15';
-  const year = parts.year + (Math.random() < 0.5 ? -1 : 1) * (1 + Math.floor(Math.random() * 4));
-  const mm = String(parts.month).padStart(2, '0');
-  const dd = String(parts.day).padStart(2, '0');
+  // A date of birth is identifying on its own: shifting only the year leaves the
+  // real month and day in place. Generate an unrelated adult birth date and
+  // keep only the original's written format.
+  const birth = faker.date.birthdate({ min: 21, max: 79, mode: 'age' });
+  const year = birth.getUTCFullYear();
+  const month = birth.getUTCMonth() + 1;
+  const day = birth.getUTCDate();
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  if (parts.format === 'month-name') {
+    const name = (parts.monthStyle === 'short' ? MONTH_SHORT : MONTH_LONG)[month - 1];
+    const separator = /,/.test(String(original)) ? ',' : '';
+    return parts.dayFirst ? `${day} ${name} ${year}` : `${name} ${day}${separator} ${year}`;
+  }
   return parts.format === 'iso' ? `${year}-${mm}-${dd}` : `${mm}/${dd}/${year}`;
 }
 
@@ -127,18 +197,57 @@ const lastFour = (value) => String(value).replace(/\D/g, '').slice(-4);
 
 const FACTORIES = {
   email: () => faker.internet.email().toLowerCase(),
-  // Valid NANP shape: area and exchange never start with 0 or 1.
-  phone: () => {
+  // Valid NANP shape: area and exchange never start with 0 or 1. The original's
+  // punctuation is kept so a bare CSV cell stays bare and an E.164 number keeps
+  // its +1 prefix.
+  phone: (original) => {
     const part = (min) => `${faker.number.int({ min, max: 9 })}${String(faker.number.int({ min: 0, max: 99 })).padStart(2, '0')}`;
-    const line = String(faker.number.int({ min: 0, max: 9999 })).padStart(4, '0');
-    return `(${part(2)}) ${part(2)}-${line}`;
+    const local = `${part(2)}${part(2)}${String(faker.number.int({ min: 0, max: 9999 })).padStart(4, '0')}`;
+    const value = String(original);
+    const allDigits = value.replace(/\D/g, '');
+    // Preserve the exact punctuation and country prefix: a bare CSV cell stays
+    // bare, "+1 (415) 555-0138" stays parenthesized, "206-555-0177" keeps dashes.
+    const country = /^\+(\d{1,3})/.exec(value);
+    const keep = country ? country[1].length : Math.max(0, allDigits.length - 10);
+    let generated = 0;
+    let seen = 0;
+    return value.replace(/\d/g, () => {
+      const index = seen;
+      seen += 1;
+      if (index < keep) return allDigits[index];
+      return local[generated++];
+    });
   },
-  ssn: () => {
-    const area = faker.number.int({ min: 101, max: 899 });
-    const group = faker.number.int({ min: 10, max: 99 });
-    const serial = faker.number.int({ min: 1000, max: 9999 });
-    return `${area}-${group}-${serial}`;
+  ssn: (original) => {
+    const dashed = String(original).includes('-');
+    let candidate;
+    do {
+      const area = faker.number.int({ min: 101, max: 899 });
+      const group = faker.number.int({ min: 10, max: 99 });
+      const serial = faker.number.int({ min: 1000, max: 9999 });
+      candidate = dashed ? `${area}-${group}-${serial}` : `${area}${group}${serial}`;
+    } while (candidate === original);
+    return candidate;
   },
+  ssnPartial: (original) => {
+    const value = String(original);
+    const lastFour = value.replace(/\D/g, '').slice(-4);
+    let fakeFour = String(faker.number.int({ min: 1000, max: 9999 }));
+    while (fakeFour === lastFour) fakeFour = String(faker.number.int({ min: 1000, max: 9999 }));
+    return /\d{4}(?!.*\d)/.test(value) ? value.replace(/\d{4}(?!.*\d)/, fakeFour) : fakeFour;
+  },
+  medicalId: scrambleDigits,
+  swiftBic: (original) =>
+    String(original)
+      .split('')
+      .map((ch) => {
+        if (/[A-Z]/i.test(ch)) return randomUpper();
+        if (/\d/.test(ch)) return String(randomDigit());
+        return ch;
+      })
+      .join(''),
+  organization: fakeOrganization,
+  profileUrl: fakeProfileUrl,
   creditCard: (original) => {
     // Never keep the real trailing digits: "ending in 1234" must not survive.
     const originalLastFour = lastFour(original);
@@ -161,16 +270,19 @@ const FACTORIES = {
   account: scrambleDigits,
   routing: fakeRouting,
   iban: fakeIban,
-  taxId: () => {
+  taxId: (original) => {
     const prefixes = [10, 20, 30, 40, 45, 47, 51, 61, 71, 81, 91, 93, 94, 95, 99];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    return `${prefix}-${Array.from({ length: 7 }, randomDigit).join('')}`;
+    return `${prefix}${String(original).includes('-') ? '-' : ''}${Array.from({ length: 7 }, randomDigit).join('')}`;
   },
   dob: fakeDob,
   address: fakeAddress,
   city: () => faker.location.city(),
   state: () => faker.location.state({ abbreviated: true }),
-  postalCode: () => faker.location.zipCode(),
+  postalCode: (original) => {
+    const zip = faker.location.zipCode('#####');
+    return String(original).includes('-') ? `${zip}-${faker.location.zipCode('####')}` : zip;
+  },
   passport: (original) =>
     /^[A-Z]\d{8}$/.test(original)
       ? `X${Array.from({ length: 8 }, randomDigit).join('')}`

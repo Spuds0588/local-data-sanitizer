@@ -14,8 +14,15 @@ import { formatCsv, parseCsv } from '../csv.js';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MAX_HEADER_SCAN = 6;
 
-function isCsv(name) {
-  return /\.csv$/i.test(name || '');
+/** CSV and TSV share the header-typing pipeline; only the delimiter differs. */
+function delimitedInfo(name) {
+  if (/\.tsv$/i.test(name || '')) {
+    return { delimiter: '\t', ext: 'tsv', mime: 'text/tab-separated-values' };
+  }
+  if (/\.csv$/i.test(name || '')) {
+    return { delimiter: ',', ext: 'csv', mime: 'text/csv' };
+  }
+  return null;
 }
 
 async function readWorkbook(file) {
@@ -70,8 +77,8 @@ export function sheetLayout(ws) {
   return { range, headerRow: headerRow < 0 ? -1 : range.s.r + headerRow, columns };
 }
 
-async function detectCsv(file) {
-  const rows = parseCsv(await file.text());
+async function detectCsv(file, info) {
+  const rows = parseCsv(await file.text(), info.delimiter);
   const { headerRow, columns } = rowLayout(rows);
   const segments = [];
   const typedValues = [];
@@ -155,7 +162,8 @@ async function detectWorkbook(file) {
 }
 
 export async function detectWithMeta(file) {
-  return isCsv(file.name) ? detectCsv(file) : detectWorkbook(file);
+  const info = delimitedInfo(file.name);
+  return info ? detectCsv(file, info) : detectWorkbook(file);
 }
 
 export async function detect(file) {
@@ -187,12 +195,16 @@ function buildLookups(entries) {
   return { textEntries, lookup, amounts };
 }
 
-async function sanitizeCsv(file, entries, log) {
-  const rows = parseCsv(await file.text());
+async function sanitizeCsv(file, entries, log, info) {
+  const rows = parseCsv(await file.text(), info.delimiter);
   const { headerRow, columns } = rowLayout(rows);
   const { textEntries, lookup } = buildLookups(entries);
 
   for (let r = 0; r < rows.length; r += 1) {
+    // Header labels are schema, not data: rewriting "City" because a payee
+    // happened to contain that word would break every reader of the file.
+    // Title rows above the header are still content and are scrubbed.
+    if (r === headerRow) continue;
     for (let c = 0; c < rows[r].length; c += 1) {
       const text = String(rows[r][c] ?? '');
       if (!text.trim()) continue;
@@ -202,9 +214,9 @@ async function sanitizeCsv(file, entries, log) {
     }
   }
 
-  const output = formatCsv(rows);
-  log(`[CSV Parser] ${file.name}: exported CSV (${output.length} chars).`);
-  return { blob: new Blob([output], { type: 'text/csv' }), name: sanitizedName(file.name, 'csv') };
+  const output = formatCsv(rows, info.delimiter);
+  log(`[${info.ext.toUpperCase()} Parser] ${file.name}: exported ${info.ext.toUpperCase()} (${output.length} chars).`);
+  return { blob: new Blob([output], { type: info.mime }), name: sanitizedName(file.name, info.ext) };
 }
 
 async function sanitizeWorkbook(file, entries, log) {
@@ -220,6 +232,8 @@ async function sanitizeWorkbook(file, entries, log) {
         for (let c = range.s.c; c <= range.e.c; c += 1) {
           const cell = ws[XLSX.utils.encode_cell({ r, c })];
           if (!cell) continue;
+          // Column headers are structure; never rewrite them.
+          if (r === headerRow) continue;
           const column = r > headerRow ? columns.get(c) : null;
 
           if (cell.t === 'n') {
@@ -289,5 +303,6 @@ async function sanitizeWorkbook(file, entries, log) {
 }
 
 export async function sanitize(file, entries, log = () => {}) {
-  return isCsv(file.name) ? sanitizeCsv(file, entries, log) : sanitizeWorkbook(file, entries, log);
+  const info = delimitedInfo(file.name);
+  return info ? sanitizeCsv(file, entries, log, info) : sanitizeWorkbook(file, entries, log);
 }

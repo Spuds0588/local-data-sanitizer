@@ -12,7 +12,7 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 899 >>
+<< /Length 906 >>
 stream
 BT /F1 10 Tf 50 750 Td 14 TL
 (NORTHWEST COMMUNITY BANK) Tj T*
@@ -25,7 +25,7 @@ BT /F1 10 Tf 50 750 Td 14 TL
 (Statement Period: 2024-01-01 to 2024-01-31) Tj T*
 (Opening Balance: $4,850.00) Tj T*
 (01/03 TRANSFER TO JANE DOE -$750.00 Balance $4,100.00) Tj T*
-(01/05 POS PURCHASE WHOLE FOODS #1042 -$128.45 Balance $3,971.55) Tj T*
+(01/05 POS PURCHASE WHOLE FOODS MARKET #1042 -$128.45 Balance $3,971.55) Tj T*
 (01/10 TRANSFER FROM ROBERT CHEN $300.00 Balance $2,071.55) Tj T*
 (01/18 PAYROLL ACME CORPORATION $1,250.00 Balance $3,006.80) Tj T*
 (01/26 TRANSFER TO PRIYA NATARAJAN -$500.00 Balance $4,270.60) Tj T*
@@ -46,5 +46,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1261
+1268
 %%EOF

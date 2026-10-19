@@ -1,0 +1,4 @@
+{"event":"contact.created","at":"2024-02-05T11:02:00Z","actor":"Dana Whitfield","contact":{"id":"CNT-5521","full_name":"Nadia Okafor","first_name":"Nadia","last_name":"Okafor","email":"nadia.okafor@riverside.example","phone":"+1 (617) 555-0110","date_of_birth":"March 3, 1990","ssn":"219-88-4433","company":"Riverside Analytics","linkedin":"https://www.linkedin.com/in/nadiaokafor","address":{"line1":"410 Maple Grove Avenue","city":"Cambridge","state":"MA","postal_code":"02139"},"credit_limit":18000,"balance":0}}
+{"event":"note.added","at":"2024-02-05T11:09:00Z","contact_id":"CNT-5521","author":"Dana Whitfield","body":"Left voicemail on 617-555-0110. Backup number 617-555-0199. SSN on file 219-88-4433."}
+{"event":"deal.updated","at":"2024-02-06T08:31:00Z","contact_id":"CNT-5521","amount":4800,"stage":"negotiation"}
+{"event":"contact.updated","at":"2024-02-06T08:33:00Z","contact_id":"CNT-5521","field":"balance","balance":4250}
