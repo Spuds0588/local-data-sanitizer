@@ -64,9 +64,10 @@ npm run build    # static output in dist/
   every push to `main` runs `.github/workflows/deploy.yml`, which builds with
   `VITE_BASE_PATH=/local-data-sanitizer/` and publishes `dist/`.
 
-  On every run the workflow also tries to pin Pages to *GitHub Actions*, because
-  a branch build overwrites the published artifact. That API call needs admin
-  rights; if it fails, the run says so and you should set [Settings → Pages → Build and deployment → Source][pages-source] to
+  Once a run has finished, the workflow also switches the Pages source to
+  *GitHub Actions*, which stops GitHub's branch build from briefly serving the
+  unbundled root on later pushes. That API call needs admin rights; if it fails,
+  the run says so and you should set [Settings → Pages → Build and deployment → Source][pages-source] to
   **GitHub Actions** by hand. While it is set to *Deploy from a branch*, GitHub
   rebuilds the repo root on every push and serves `index.html` verbatim, which
   points at the unbundled `/src/main.jsx` and renders a blank page until the
