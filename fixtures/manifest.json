@@ -1,0 +1,1087 @@
+{
+  "generatedBy": "scripts/generate-fixtures.mjs",
+  "files": [
+    {
+      "name": "bank-transactions.csv",
+      "secrets": [
+        {
+          "value": "Acme Corporation",
+          "match": "text"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "Whole Foods Market",
+          "match": "text"
+        },
+        {
+          "value": "Westbrook Properties",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "Harbor Dental LLC",
+          "match": "text"
+        },
+        {
+          "value": "City Power & Light",
+          "match": "text"
+        },
+        {
+          "value": "Northwind Traders",
+          "match": "text"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "Blue Cross Blue Shield",
+          "match": "text"
+        },
+        {
+          "value": "Luis Ortega",
+          "match": "text"
+        },
+        {
+          "value": "Northwest Community Bank",
+          "match": "text"
+        },
+        {
+          "value": "4850.00",
+          "match": "number"
+        },
+        {
+          "value": "750.00",
+          "match": "number"
+        },
+        {
+          "value": "4100.00",
+          "match": "number"
+        },
+        {
+          "value": "128.45",
+          "match": "number"
+        },
+        {
+          "value": "3971.55",
+          "match": "number"
+        },
+        {
+          "value": "2200.00",
+          "match": "number"
+        },
+        {
+          "value": "1771.55",
+          "match": "number"
+        },
+        {
+          "value": "300.00",
+          "match": "number"
+        },
+        {
+          "value": "2071.55",
+          "match": "number"
+        },
+        {
+          "value": "95.25",
+          "match": "number"
+        },
+        {
+          "value": "2166.80",
+          "match": "number"
+        },
+        {
+          "value": "410.00",
+          "match": "number"
+        },
+        {
+          "value": "1756.80",
+          "match": "number"
+        },
+        {
+          "value": "1250.00",
+          "match": "number"
+        },
+        {
+          "value": "3006.80",
+          "match": "number"
+        },
+        {
+          "value": "86.20",
+          "match": "number"
+        },
+        {
+          "value": "2920.60",
+          "match": "number"
+        },
+        {
+          "value": "1850.00",
+          "match": "number"
+        },
+        {
+          "value": "4770.60",
+          "match": "number"
+        },
+        {
+          "value": "500.00",
+          "match": "number"
+        },
+        {
+          "value": "4270.60",
+          "match": "number"
+        },
+        {
+          "value": "640.00",
+          "match": "number"
+        },
+        {
+          "value": "3630.60",
+          "match": "number"
+        },
+        {
+          "value": "250.00",
+          "match": "number"
+        },
+        {
+          "value": "3380.60",
+          "match": "number"
+        },
+        {
+          "value": "12.00",
+          "match": "number"
+        },
+        {
+          "value": "3368.60",
+          "match": "number"
+        },
+        {
+          "value": "TXN-88213",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88214",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88215",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88216",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88217",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88218",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88219",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88220",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88221",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88222",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88223",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88224",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88225",
+          "match": "text"
+        },
+        {
+          "value": "TXN-88226",
+          "match": "text"
+        },
+        {
+          "value": "004211889301",
+          "match": "text"
+        },
+        {
+          "value": "553100287",
+          "match": "text"
+        },
+        {
+          "value": "021000021",
+          "match": "text"
+        },
+        {
+          "value": "325081403",
+          "match": "text"
+        },
+        {
+          "value": "4111111111111111",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "accounts-receivable.xlsx",
+      "secrets": [
+        {
+          "value": "Harbor Dental LLC",
+          "match": "text"
+        },
+        {
+          "value": "billing@harbordental.example",
+          "match": "text"
+        },
+        {
+          "value": "(206) 555-0142",
+          "match": "text"
+        },
+        {
+          "value": "91-2837465",
+          "match": "text"
+        },
+        {
+          "value": "GB82WEST12345698765432",
+          "match": "text"
+        },
+        {
+          "value": "12500",
+          "match": "number"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@example.com",
+          "match": "text"
+        },
+        {
+          "value": "206-555-0177",
+          "match": "text"
+        },
+        {
+          "value": "47-3928174",
+          "match": "text"
+        },
+        {
+          "value": "DE89370400440532013000",
+          "match": "text"
+        },
+        {
+          "value": "8450.75",
+          "match": "number"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "robert.chen@example.com",
+          "match": "text"
+        },
+        {
+          "value": "415-555-0193",
+          "match": "text"
+        },
+        {
+          "value": "82-1938475",
+          "match": "text"
+        },
+        {
+          "value": "FR1420041010050500013M02606",
+          "match": "text"
+        },
+        {
+          "value": "3200",
+          "match": "number"
+        },
+        {
+          "value": "1600",
+          "match": "number"
+        },
+        {
+          "value": "Northwind Traders",
+          "match": "text"
+        },
+        {
+          "value": "ap@northwind.example",
+          "match": "text"
+        },
+        {
+          "value": "503-555-0128",
+          "match": "text"
+        },
+        {
+          "value": "61-8473920",
+          "match": "text"
+        },
+        {
+          "value": "NL91ABNA0417164300",
+          "match": "text"
+        },
+        {
+          "value": "18900",
+          "match": "number"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "priya.n@example.com",
+          "match": "text"
+        },
+        {
+          "value": "312-555-0164",
+          "match": "text"
+        },
+        {
+          "value": "39-2847561",
+          "match": "text"
+        },
+        {
+          "value": "ES9121000418450200051332",
+          "match": "text"
+        },
+        {
+          "value": "4750.5",
+          "match": "number"
+        },
+        {
+          "value": "Westbrook Properties",
+          "match": "text"
+        },
+        {
+          "value": "accounts@westbrook.example",
+          "match": "text"
+        },
+        {
+          "value": "720-555-0119",
+          "match": "text"
+        },
+        {
+          "value": "84-7362519",
+          "match": "text"
+        },
+        {
+          "value": "IT60X0542811101000000123456",
+          "match": "text"
+        },
+        {
+          "value": "5400",
+          "match": "number"
+        },
+        {
+          "value": "CUST-1042",
+          "match": "text"
+        },
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace, Springfield, IL 62704",
+          "match": "text"
+        },
+        {
+          "value": "1986-04-17",
+          "match": "text"
+        },
+        {
+          "value": "573-91-2244",
+          "match": "text"
+        },
+        {
+          "value": "884201553",
+          "match": "text"
+        },
+        {
+          "value": "25000",
+          "match": "number"
+        },
+        {
+          "value": "CUST-1043",
+          "match": "text"
+        },
+        {
+          "value": "+1 (206) 555-0177",
+          "match": "text"
+        },
+        {
+          "value": "88 Cedar Hollow Lane, Portland, OR 97205",
+          "match": "text"
+        },
+        {
+          "value": "1979-11-02",
+          "match": "text"
+        },
+        {
+          "value": "412-88-7315",
+          "match": "text"
+        },
+        {
+          "value": "553100287",
+          "match": "text"
+        },
+        {
+          "value": "15000",
+          "match": "number"
+        },
+        {
+          "value": "CUST-1044",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0193",
+          "match": "text"
+        },
+        {
+          "value": "15 Beacon Street, Boston, MA 02108",
+          "match": "text"
+        },
+        {
+          "value": "1992-08-23",
+          "match": "text"
+        },
+        {
+          "value": "627-44-9018",
+          "match": "text"
+        },
+        {
+          "value": "771904326",
+          "match": "text"
+        },
+        {
+          "value": "8000",
+          "match": "number"
+        },
+        {
+          "value": "CUST-1045",
+          "match": "text"
+        },
+        {
+          "value": "+1 (312) 555-0164",
+          "match": "text"
+        },
+        {
+          "value": "2210 Lakeshore Drive, Chicago, IL 60614",
+          "match": "text"
+        },
+        {
+          "value": "1988-01-30",
+          "match": "text"
+        },
+        {
+          "value": "508-63-4420",
+          "match": "text"
+        },
+        {
+          "value": "663028914",
+          "match": "text"
+        },
+        {
+          "value": "12000",
+          "match": "number"
+        }
+      ]
+    },
+    {
+      "name": "user-export.json",
+      "secrets": [
+        {
+          "value": "USR-88213",
+          "match": "text"
+        },
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "573-91-2244",
+          "match": "text"
+        },
+        {
+          "value": "1986-04-17",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace",
+          "match": "text"
+        },
+        {
+          "value": "Springfield",
+          "match": "text"
+        },
+        {
+          "value": "62704",
+          "match": "text"
+        },
+        {
+          "value": "203.0.113.42",
+          "match": "text"
+        },
+        {
+          "value": "884201553",
+          "match": "text"
+        },
+        {
+          "value": "021000021",
+          "match": "text"
+        },
+        {
+          "value": "4111 1111 1111 1111",
+          "match": "text"
+        },
+        {
+          "value": "Winter2024!",
+          "match": "text"
+        },
+        {
+          "value": "sk-proj-9f3a2b7c4d8e1f6a0b5c9d2e7f4a1b8c",
+          "match": "text"
+        },
+        {
+          "value": "AKIAIOSFODNN7EXAMPLE",
+          "match": "text"
+        },
+        {
+          "value": "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+          "match": "text"
+        },
+        {
+          "value": "25000",
+          "match": "number"
+        },
+        {
+          "value": "4250",
+          "match": "number"
+        },
+        {
+          "value": "USR-88214",
+          "match": "text"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (206) 555-0177",
+          "match": "text"
+        },
+        {
+          "value": "412-88-7315",
+          "match": "text"
+        },
+        {
+          "value": "1979-11-02",
+          "match": "text"
+        },
+        {
+          "value": "88 Cedar Hollow Lane",
+          "match": "text"
+        },
+        {
+          "value": "Portland",
+          "match": "text"
+        },
+        {
+          "value": "97205",
+          "match": "text"
+        },
+        {
+          "value": "198.51.100.17",
+          "match": "text"
+        },
+        {
+          "value": "553100287",
+          "match": "text"
+        },
+        {
+          "value": "325081403",
+          "match": "text"
+        },
+        {
+          "value": "5500 0000 0000 0004",
+          "match": "text"
+        },
+        {
+          "value": "hunter2-Plum-91",
+          "match": "text"
+        },
+        {
+          "value": "sk-live-7c2b9e4d1a8f3e6b0c5d9a2f4e7b1c3d",
+          "match": "text"
+        },
+        {
+          "value": "15000",
+          "match": "number"
+        },
+        {
+          "value": "3120.5",
+          "match": "number"
+        },
+        {
+          "value": "USR-88215",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "robert.chen@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0193",
+          "match": "text"
+        },
+        {
+          "value": "627-44-9018",
+          "match": "text"
+        },
+        {
+          "value": "1992-08-23",
+          "match": "text"
+        },
+        {
+          "value": "15 Beacon Street",
+          "match": "text"
+        },
+        {
+          "value": "Boston",
+          "match": "text"
+        },
+        {
+          "value": "02108",
+          "match": "text"
+        },
+        {
+          "value": "192.0.2.88",
+          "match": "text"
+        },
+        {
+          "value": "771904326",
+          "match": "text"
+        },
+        {
+          "value": "Beacon#2024!",
+          "match": "text"
+        },
+        {
+          "value": "sk-proj-2b8d4e6f1a3c5e7b9d0f2a4c6e8b1d3f",
+          "match": "text"
+        },
+        {
+          "value": "8000",
+          "match": "number"
+        },
+        {
+          "value": "USR-88216",
+          "match": "text"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "priya.n@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (312) 555-0164",
+          "match": "text"
+        },
+        {
+          "value": "508-63-4420",
+          "match": "text"
+        },
+        {
+          "value": "1988-01-30",
+          "match": "text"
+        },
+        {
+          "value": "2210 Lakeshore Drive",
+          "match": "text"
+        },
+        {
+          "value": "Chicago",
+          "match": "text"
+        },
+        {
+          "value": "60614",
+          "match": "text"
+        },
+        {
+          "value": "203.0.113.99",
+          "match": "text"
+        },
+        {
+          "value": "663028914",
+          "match": "text"
+        },
+        {
+          "value": "Lakeshore-88!",
+          "match": "text"
+        },
+        {
+          "value": "sk-live-5a1c3e7b9d2f4a6c8e0b2d4f6a8c1e3b",
+          "match": "text"
+        },
+        {
+          "value": "12000",
+          "match": "number"
+        },
+        {
+          "value": "1875.25",
+          "match": "number"
+        }
+      ]
+    },
+    {
+      "name": "kyc-profile.docx",
+      "secrets": [
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "04/17/1986",
+          "match": "text"
+        },
+        {
+          "value": "573-91-2244",
+          "match": "text"
+        },
+        {
+          "value": "512345678",
+          "match": "text"
+        },
+        {
+          "value": "WDL-8842193",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace, Springfield, IL 62704",
+          "match": "text"
+        },
+        {
+          "value": "Northwind Traders",
+          "match": "text"
+        },
+        {
+          "value": "148500.00",
+          "match": "number"
+        },
+        {
+          "value": "884201553",
+          "match": "text"
+        },
+        {
+          "value": "021000021",
+          "match": "text"
+        },
+        {
+          "value": "GB82WEST12345698765432",
+          "match": "text"
+        },
+        {
+          "value": "203.0.113.42",
+          "match": "text"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "Jane",
+          "match": "text"
+        },
+        {
+          "value": "**** **** **** 1111",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@example.com",
+          "match": "text"
+        },
+        {
+          "value": "(206) 555-0177",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "robert.chen@example.com",
+          "match": "text"
+        },
+        {
+          "value": "(415) 555-0193",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "statement.pdf",
+      "secrets": [
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "884201553",
+          "match": "text"
+        },
+        {
+          "value": "021000021",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace, Springfield, IL 62704",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "+1 (415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "(415) 555-0138",
+          "match": "text"
+        },
+        {
+          "value": "4850.00",
+          "match": "number"
+        },
+        {
+          "value": "4100.00",
+          "match": "number"
+        },
+        {
+          "value": "750.00",
+          "match": "number"
+        },
+        {
+          "value": "128.45",
+          "match": "number"
+        },
+        {
+          "value": "3971.55",
+          "match": "number"
+        },
+        {
+          "value": "300.00",
+          "match": "number"
+        },
+        {
+          "value": "2071.55",
+          "match": "number"
+        },
+        {
+          "value": "1250.00",
+          "match": "number"
+        },
+        {
+          "value": "3006.80",
+          "match": "number"
+        },
+        {
+          "value": "500.00",
+          "match": "number"
+        },
+        {
+          "value": "4270.60",
+          "match": "number"
+        },
+        {
+          "value": "3368.60",
+          "match": "number"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "Whole Foods",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "Acme Corporation",
+          "match": "text"
+        },
+        {
+          "value": "Priya Natarajan",
+          "match": "text"
+        },
+        {
+          "value": "**** **** **** 1111",
+          "match": "text"
+        }
+      ]
+    },
+    {
+      "name": "support-tickets.csv",
+      "secrets": [
+        {
+          "value": "TKT-4411",
+          "match": "text"
+        },
+        {
+          "value": "Hi, I'm Jane Doe. My card ending in 1111 was charged twice. Call me at (206) 555-0177 or jane.doe@example.com. My SSN is 123-45-6789 and my account number is 553100287. I live at 88 Cedar Hollow Lane, Portland, OR 97205. Password: Winter2024!",
+          "match": "text"
+        },
+        {
+          "value": "Dana Whitfield",
+          "match": "text"
+        },
+        {
+          "value": "jane.doe@example.com",
+          "match": "text"
+        },
+        {
+          "value": "TKT-4412",
+          "match": "text"
+        },
+        {
+          "value": "This is Marcus Webb (marcus.webb@example.com). Please update my address to 742 Evergreen Terrace, Springfield, IL 62704. My API key sk-proj-9f3a2b7c4d8e1f6a0b5c9d2e7f4a1b8c stopped working and my IP is 198.51.100.17.",
+          "match": "text"
+        },
+        {
+          "value": "Luis Ortega",
+          "match": "text"
+        },
+        {
+          "value": "marcus.webb@example.com",
+          "match": "text"
+        },
+        {
+          "value": "TKT-4413",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen here — SSN 627-44-9018, DOB 08/23/1992. Wire to IBAN NL91ABNA0417164300. Thanks.",
+          "match": "text"
+        },
+        {
+          "value": "robert.chen@example.com",
+          "match": "text"
+        },
+        {
+          "value": "Jane Doe",
+          "match": "text"
+        },
+        {
+          "value": "1111",
+          "match": "text"
+        },
+        {
+          "value": "(206) 555-0177",
+          "match": "text"
+        },
+        {
+          "value": "123-45-6789",
+          "match": "text"
+        },
+        {
+          "value": "553100287",
+          "match": "text"
+        },
+        {
+          "value": "88 Cedar Hollow Lane, Portland, OR 97205",
+          "match": "text"
+        },
+        {
+          "value": "Winter2024!",
+          "match": "text"
+        },
+        {
+          "value": "Marcus Webb",
+          "match": "text"
+        },
+        {
+          "value": "742 Evergreen Terrace, Springfield, IL 62704",
+          "match": "text"
+        },
+        {
+          "value": "sk-proj-9f3a2b7c4d8e1f6a0b5c9d2e7f4a1b8c",
+          "match": "text"
+        },
+        {
+          "value": "198.51.100.17",
+          "match": "text"
+        },
+        {
+          "value": "Robert Chen",
+          "match": "text"
+        },
+        {
+          "value": "627-44-9018",
+          "match": "text"
+        },
+        {
+          "value": "08/23/1992",
+          "match": "text"
+        },
+        {
+          "value": "NL91ABNA0417164300",
+          "match": "text"
+        }
+      ]
+    }
+  ]
+}

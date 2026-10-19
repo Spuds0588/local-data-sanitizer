@@ -179,7 +179,7 @@ describe('docxParser', () => {
 describe('end-to-end via engine (docx)', () => {
   it('detects and downloads a sanitized docx', async () => {
     const zip = new JSZip();
-    zip.file('word/document.xml', '<w:document><w:p><w:t>Secret Project Phoenix</w:t></w:p></w:document>');
+    zip.file('word/document.xml', '<w:document><w:p><w:t>Secret Project Phoenix — Phoenix</w:t></w:p></w:document>');
     const file = new File([await zip.generateAsync({ type: 'nodebuffer' })], 's.docx', {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });

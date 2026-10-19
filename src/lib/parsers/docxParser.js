@@ -1,7 +1,8 @@
-// DOCX: unzip -> edit word/document.xml text nodes -> re-zip.
+// DOCX: unzip -> read paragraphs and tables -> edit word/document.xml text nodes -> re-zip.
 
 import JSZip from 'jszip';
 import { applyEntriesToText, sanitizedName } from '../text.js';
+import { classifyHeader, extractTypedValue } from '../columns.js';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -30,12 +31,64 @@ async function documentXml(zip, file) {
   return entry.async('string');
 }
 
-export async function detect(file) {
+/**
+ * Rows of `<w:tbl>` tables as arrays of cell text. A table is structured data:
+ * its first row names the columns, so "Beneficiary" / "Email" can type the
+ * cells beneath them even though a bare "Jane Doe" looks like any other words.
+ */
+export function documentTables(xml) {
+  const tables = [];
+  const tableRe = /<w:tbl>([\s\S]*?)<\/w:tbl>/g;
+  let tableMatch;
+  while ((tableMatch = tableRe.exec(xml)) !== null) {
+    const rows = [];
+    const rowRe = /<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g;
+    let rowMatch;
+    while ((rowMatch = rowRe.exec(tableMatch[1])) !== null) {
+      const cells = [];
+      const cellRe = /<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g;
+      let cellMatch;
+      while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
+        cells.push(textNodes(cellMatch[1]).join(' ').replace(/\s+/g, ' ').trim());
+      }
+      if (cells.length) rows.push(cells);
+    }
+    if (rows.length) tables.push(rows);
+  }
+  return tables;
+}
+
+export async function detectWithMeta(file) {
   const zip = await loadZip(file);
   const xml = await documentXml(zip, file);
-  const nodes = textNodes(xml);
-  console.log(`[DOCX Parser] ${file.name}: document.xml is ${xml.length} chars, ${nodes.length} text node(s).`);
-  return nodes;
+  const segments = textNodes(xml);
+  const typedValues = [];
+  const moneyNumbers = [];
+
+  for (const rows of documentTables(xml)) {
+    const headers = rows[0].map((cell) => classifyHeader(cell));
+    if (headers.filter(Boolean).length < 2) continue;
+    for (const row of rows.slice(1)) {
+      row.forEach((cell, i) => {
+        if (!cell || !headers[i]) return;
+        const item = extractTypedValue(headers[i], cell);
+        if (!item) return;
+        if (item.type === 'amount') moneyNumbers.push({ original: item.original, key: 'table', numeric: false });
+        else typedValues.push({ original: item.original, type: item.type, key: 'table', numeric: false });
+      });
+    }
+  }
+
+  console.log(
+    `[DOCX Parser] ${file.name}: document.xml is ${xml.length} chars, ` +
+      `${segments.length} text node(s), ${typedValues.length} typed table cell(s).`,
+  );
+  return { segments, typedValues, moneyNumbers };
+}
+
+export async function detect(file) {
+  const { segments } = await detectWithMeta(file);
+  return segments;
 }
 
 export async function sanitize(file, entries) {

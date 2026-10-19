@@ -5,9 +5,11 @@ import { generateFake } from './fake.js';
 import { getParser } from './parsers/index.js';
 import { escapeRegExp } from './text.js';
 
+const CASELESS_TYPES = new Set(['custom', 'email', 'name', 'password']);
+
 /** Case-insensitive types share one dictionary entry regardless of casing. */
 export function canonicalKey(type, value) {
-  return type === 'custom' || type === 'email' ? value.toLowerCase() : value;
+  return CASELESS_TYPES.has(type) ? String(value).toLowerCase() : value;
 }
 
 function makeContext(text, match, radius = 45) {
@@ -46,21 +48,42 @@ function occurrenceStats(texts, value) {
  * the unspaced form "JohnSmith"), each mapped to the matching token of the
  * parent's fake so the whole document stays internally consistent.
  */
+/** Remove a whole phrase so its own words are not counted as standalone hits. */
+function stripPhrase(text, value) {
+  const re = new RegExp(
+    `(?<![A-Za-z0-9])(?:${escapeRegExp(value)})(?![A-Za-z0-9])`,
+    'gi',
+  );
+  return text.replace(re, (match) => ' '.repeat(match.length));
+}
+
+const EXPANDABLE_TYPES = new Set(['custom', 'name']);
+
+// Never turn a generic corporate suffix or filler word into a standalone
+// replacement: "LLC" in one row must not become a person's surname.
+const GENERIC_NAME_WORDS = new Set([
+  'llc', 'inc', 'corp', 'ltd', 'co', 'plc', 'gmbh', 'the', 'and', 'of', '&',
+  'group', 'team', 'company', 'corporation', 'incorporated', 'limited',
+]);
+
 export function expandEntries(entries, texts = []) {
   const out = [...entries];
   const taken = new Set(entries.map((e) => `${e.type}:${canonicalKey(e.type, e.original)}`));
 
-  const add = (original, fakeValue, parent) => {
-    const key = canonicalKey('custom', original);
-    if (original.length < 3 || taken.has(`custom:${key}`)) return;
+  const add = (original, fakeValue, parent, type, searchTexts) => {
+    const key = canonicalKey(type, original);
+    if (original.length < 3 || taken.has(`${type}:${key}`)) return;
+    if (type === 'name' && GENERIC_NAME_WORDS.has(original.toLowerCase())) return;
     if (original.toLowerCase() === String(fakeValue).toLowerCase()) return;
-    const { count, context } = occurrenceStats(texts, original);
+    // "Northwest Community Bank" says nothing about a standalone "Bank": the
+    // phrase itself contains that word, so strip it before counting tokens.
+    const { count, context } = occurrenceStats(searchTexts, original);
     if (count === 0) return;
-    taken.add(`custom:${key}`);
+    taken.add(`${type}:${key}`);
     out.push({
-      id: `custom:${key}`,
+      id: `${type}:${key}`,
       key,
-      type: 'custom',
+      type,
       original,
       fakeValue,
       count,
@@ -71,13 +94,14 @@ export function expandEntries(entries, texts = []) {
   };
 
   for (const entry of entries) {
-    if (entry.type !== 'custom') continue;
+    if (!EXPANDABLE_TYPES.has(entry.type)) continue;
     const originals = String(entry.original).trim().split(/\s+/);
     if (originals.length < 2) continue;
     const fakes = String(entry.fakeValue).trim().split(/\s+/);
     if (fakes.length !== originals.length) continue;
-    originals.forEach((original, i) => add(original, fakes[i], entry));
-    add(originals.join(''), fakes.join(''), entry);
+    const searchTexts = texts.map((text) => stripPhrase(text, entry.original));
+    originals.forEach((original, i) => add(original, fakes[i], entry, entry.type, searchTexts));
+    add(originals.join(''), fakes.join(''), entry, entry.type, searchTexts);
   }
 
   return out;
@@ -167,6 +191,42 @@ function addMoneyNumbers(found, moneyNumbers) {
 }
 
 /**
+ * Values the parser typed from column headers / object keys (a bare account
+ * number, a customer name, a date of birth). They join the same dictionary as
+ * regex hits so every occurrence is replaced consistently.
+ */
+function addTypedValues(found, typedValues) {
+  const byKey = new Map(found.map((e) => [`${e.type}:${canonicalKey(e.type, e.original)}`, e]));
+  const byOriginal = new Map(found.map((e) => [e.original, e]));
+  for (const item of typedValues) {
+    const original = String(item.original ?? '');
+    if (!original) continue;
+    const key = `${item.type}:${canonicalKey(item.type, original)}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (!item.numeric) delete existing.numericOnly;
+      continue;
+    }
+    // The text scan already found this exact value under another type. One
+    // entry is enough; replacing it once removes every occurrence.
+    if (byOriginal.has(original)) continue;
+    const entry = {
+      id: key,
+      key: canonicalKey(item.type, original),
+      type: item.type,
+      original,
+      count: 1,
+      context: `${item.key || 'column'}: ${original}`,
+    };
+    if (item.numeric) entry.numericOnly = true;
+    byKey.set(key, entry);
+    byOriginal.set(original, entry);
+    found.push(entry);
+  }
+}
+
+/**
  * Scan every file and build the review entries (original -> proposed fake).
  * @param {File[]} files
  * @param {import('./rules.js').DEFAULT_CONFIG} config
@@ -175,6 +235,7 @@ function addMoneyNumbers(found, moneyNumbers) {
 export async function analyzeFiles(files, config, log = () => {}) {
   const texts = [];
   const moneyNumbers = [];
+  const typedValues = [];
   for (const file of files) {
     const parser = getParser(file);
     const detected = parser.detectWithMeta
@@ -183,17 +244,30 @@ export async function analyzeFiles(files, config, log = () => {}) {
     const segments = Array.isArray(detected) ? detected : detected.segments || [];
     log(`Scanned "${file.name}" (${segments.length} text segment(s)).`);
     texts.push(...segments);
-    if (!Array.isArray(detected) && Array.isArray(detected.moneyNumbers)) {
-      moneyNumbers.push(...detected.moneyNumbers);
+    if (!Array.isArray(detected)) {
+      if (Array.isArray(detected.moneyNumbers)) moneyNumbers.push(...detected.moneyNumbers);
+      if (Array.isArray(detected.typedValues)) typedValues.push(...detected.typedValues);
     }
   }
 
   const found = scanTexts(texts, config);
   addMoneyNumbers(found, moneyNumbers);
-  const used = new Set();
+  addTypedValues(found, typedValues);
+  // A fake must never collide with any original value either: publishing
+  // another file's real balance (or name) as a "replacement" would defeat the
+  // sanitizer even though the bytes changed.
+  const used = new Set(found.map((item) => String(item.original)));
+  // A fake must not accidentally reuse a real name word from any file: a
+  // "Marcus Webb" replacement of "Marcus Hart" would still publish "Marcus".
+  const forbidden = new Set();
+  for (const item of found) {
+    for (const token of String(item.original).toLowerCase().split(/\s+/)) {
+      if (token.length >= 3) forbidden.add(token);
+    }
+  }
   let entries = found.map((f) => ({
     ...f,
-    fakeValue: generateFake(f.type, f.original, used),
+    fakeValue: generateFake(f.type, f.original, used, forbidden),
     enabled: true,
   }));
   entries = expandEntries(entries, texts);

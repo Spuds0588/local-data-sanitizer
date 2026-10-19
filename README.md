@@ -23,9 +23,18 @@ minimal outline icons. Nothing else is on screen: no dashboards, no logs panel, 
 ## Features
 
 - **Uploads:** drag & drop `.docx`, `.xlsx`, `.xls`, `.csv`, `.json`, `.pdf` (25 MB per file).
-- **Rules engine:** toggle standard detectors (email, phone, SSN, Luhn-checked cards, and
-  masked/last-four card fragments) and add your own secret keywords ("Project Phoenix",
-  "Elon Musk", …).
+- **Rules engine:** toggle standard detectors — email, phone, SSN, Luhn-checked cards and
+  masked/last-four fragments, EIN tax IDs, IBANs (MOD-97), ABA routing numbers, bank
+  accounts, dates of birth, street addresses, IPs, passports, driver's licences,
+  passwords, API keys (OpenAI/AWS/GitHub/Slack/JWT) and user/transaction IDs — and add
+  your own secret keywords ("Project Phoenix", "Elon Musk", …).
+- **Context-aware typecasting:** a spreadsheet header (`Account Number`, `Balance`,
+  `Full Name`, `Date of Birth`) or a JSON key (`account_number`, `balance`, `ssn`) tells the
+  sanitizer what a bare value is. `4250` under `balance`, `884201553` under
+  `account_number` and `Jane Doe` under `Payee` are no longer invisible, and the same
+  value is replaced the same way in every uploaded file.
+- **Exact CSV handling:** CSV is read as UTF-8 text, so leading zeros in account numbers,
+  non-ASCII names and quoted multi-line messages survive the round trip.
 - **Value jiggler:** monetary amounts (`$1,234.56`, `USD 2,000`, `5,000.00`, `1200.75`,
   including `-` and accounting `(…)` forms) are shifted by up to ±20% while keeping the
   currency mark, thousands separators, decimals and sign. Numeric JSON leaves stay numbers,
@@ -53,10 +62,33 @@ React 19 + Vite (SPA) · TailwindCSS v4 (grayscale-only utilities) · [`@faker-j
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm test         # unit tests (vitest)
-npm run build    # static output in dist/
+npm run dev             # http://localhost:5173
+npm test                # all unit + fixture-corpus tests (vitest)
+npm run check:fixtures  # only the end-to-end leak test
+npm run fixtures        # regenerate the synthetic corpus + manifest
+npm run build           # static output in dist/
 ```
+
+## Test corpus
+
+`fixtures/` is a committed corpus of synthetic but realistic exports:
+
+| File | Shape | Sensitive data it exercises |
+| --- | --- | --- |
+| `bank-transactions.csv` | 14-row bank log | account/routing numbers, cards, payees, refs, whole-dollar balances |
+| `accounts-receivable.xlsx` | invoices + customers sheets | names, emails, phones, EINs, IBANs, addresses, DOBs, SSNs, accounts, formatted money |
+| `user-export.json` | nested user export | numeric + string accounts, nested address, IPs, passwords, API keys, money-keyed numbers |
+| `kyc-profile.docx` | labelled paragraphs + beneficiary table | names, passport, licence, DOB, address, income, table cells |
+| `statement.pdf` | text-layer statement | holder, account, address, transaction counterparties, balances, masked card |
+| `support-tickets.csv` | free-text inbox | PII inside sentences, labels, API keys, UTF-8 punctuation |
+
+`fixtures/manifest.json` lists every synthetic value that must not survive, with a text or
+numeric matcher. `src/lib/__tests__/fixtures.test.js` scans the whole corpus together
+(so cross-file consistency is testable), re-extracts each sanitized output, and fails on
+any surviving value. It also asserts structure was preserved: row counts, sheet names,
+`$#,##0.00` number formats, JSON types and keys, a valid DOCX table, PDF text labels, and
+the same fake account/card appearing in every file. Regenerating the corpus keeps the
+manifest in sync; replacements themselves are random per run.
 
 ## Deploy
 
@@ -77,9 +109,15 @@ npm run build    # static output in dist/
 
 ## Known limitations (V1)
 
+- An unlabelled person or company name in free prose is only caught when the same value is
+  established by another column, JSON key, table header or label in the session; there is no
+  general named-entity model. Add it as a custom keyword when it must be caught on its own.
 - PDF text extraction can miss PII that spans multiple PDF text runs, and always outputs `.txt`.
 - DOCX replacement edits `word/document.xml` text nodes; PII split across multiple Word
   runs may not be caught, and headers/footers are not scanned yet.
-- SheetJS export re-creates the workbook, so exotic cell styling is not preserved.
-- The jiggler reads US-style amounts only (`1,234.56`, not `1.234,56`), leaves bare integers
-  (counts, IDs, years) alone, and does not recompute totals or subtotals after a shift.
+- Advanced cell styling beyond number formats is not fully preserved by SheetJS.
+- The jiggler reads US-style amounts only (`1,234.56`, not `1.234,56`), treats bare integers as
+  money only when a header/key says they are, and does not recompute totals or subtotals
+  after a shift.
+- `state`/province abbreviations are intentionally left alone: two letters are too short to
+  replace safely in free text.

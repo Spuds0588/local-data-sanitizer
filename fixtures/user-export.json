@@ -1,0 +1,100 @@
+{
+  "export_version": 2,
+  "generated_at": "2024-02-01T09:15:00Z",
+  "users": [
+    {
+      "user_id": "USR-88213",
+      "full_name": "Marcus Webb",
+      "email": "marcus.webb@example.com",
+      "phone": "+1 (415) 555-0138",
+      "ssn": "573-91-2244",
+      "date_of_birth": "1986-04-17",
+      "address": {
+        "line1": "742 Evergreen Terrace",
+        "city": "Springfield",
+        "state": "IL",
+        "postal_code": "62704"
+      },
+      "ip_address": "203.0.113.42",
+      "account_number": 884201553,
+      "routing_number": "021000021",
+      "credit_card": "4111 1111 1111 1111",
+      "password": "Winter2024!",
+      "api_key": "sk-proj-9f3a2b7c4d8e1f6a0b5c9d2e7f4a1b8c",
+      "aws_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+      "github_token": "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+      "credit_limit": 25000,
+      "balance": 4250,
+      "is_active": true
+    },
+    {
+      "user_id": "USR-88214",
+      "full_name": "Jane Doe",
+      "email": "jane.doe@example.com",
+      "phone": "+1 (206) 555-0177",
+      "ssn": "412-88-7315",
+      "date_of_birth": "1979-11-02",
+      "address": {
+        "line1": "88 Cedar Hollow Lane",
+        "city": "Portland",
+        "state": "OR",
+        "postal_code": "97205"
+      },
+      "ip_address": "198.51.100.17",
+      "account_number": "553100287",
+      "routing_number": "325081403",
+      "credit_card": "5500 0000 0000 0004",
+      "password": "hunter2-Plum-91",
+      "api_key": "sk-live-7c2b9e4d1a8f3e6b0c5d9a2f4e7b1c3d",
+      "credit_limit": 15000,
+      "balance": 3120.5,
+      "is_active": true
+    },
+    {
+      "user_id": "USR-88215",
+      "full_name": "Robert Chen",
+      "email": "robert.chen@example.com",
+      "phone": "+1 (415) 555-0193",
+      "ssn": "627-44-9018",
+      "date_of_birth": "1992-08-23",
+      "address": {
+        "line1": "15 Beacon Street",
+        "city": "Boston",
+        "state": "MA",
+        "postal_code": "02108"
+      },
+      "ip_address": "192.0.2.88",
+      "account_number": 771904326,
+      "routing_number": "021000021",
+      "credit_card": "4111 1111 1111 1111",
+      "password": "Beacon#2024!",
+      "api_key": "sk-proj-2b8d4e6f1a3c5e7b9d0f2a4c6e8b1d3f",
+      "credit_limit": 8000,
+      "balance": 0,
+      "is_active": false
+    },
+    {
+      "user_id": "USR-88216",
+      "full_name": "Priya Natarajan",
+      "email": "priya.n@example.com",
+      "phone": "+1 (312) 555-0164",
+      "ssn": "508-63-4420",
+      "date_of_birth": "1988-01-30",
+      "address": {
+        "line1": "2210 Lakeshore Drive",
+        "city": "Chicago",
+        "state": "IL",
+        "postal_code": "60614"
+      },
+      "ip_address": "203.0.113.99",
+      "account_number": "663028914",
+      "routing_number": "021000021",
+      "credit_card": "5500 0000 0000 0004",
+      "password": "Lakeshore-88!",
+      "api_key": "sk-live-5a1c3e7b9d2f4a6c8e0b2d4f6a8c1e3b",
+      "credit_limit": 12000,
+      "balance": 1875.25,
+      "is_active": true
+    }
+  ]
+}

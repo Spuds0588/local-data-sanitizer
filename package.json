@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "fixtures": "node scripts/generate-fixtures.mjs",
+    "check:fixtures": "vitest run src/lib/__tests__/fixtures.test.js"
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",

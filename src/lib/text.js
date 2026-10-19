@@ -53,7 +53,14 @@ export function applyEntriesToText(text, entries, opts = {}) {
     if (!lookup.has(key)) lookup.set(key, entry);
   }
 
-  const re = new RegExp(active.map((entry) => escapeRegExp(entry.original)).join('|'), 'gi');
+  // Alphanumeric boundaries keep a short entry ("Doe", "4250") from rewriting
+  // the middle of a longer word or number it merely appears inside.
+  const re = new RegExp(
+    active
+      .map((entry) => `(?<![A-Za-z0-9])(?:${escapeRegExp(entry.original)})(?![A-Za-z0-9])`)
+      .join('|'),
+    'gi',
+  );
   return text.replace(re, (match) => {
     const entry = lookup.get(match.toLowerCase());
     if (!entry) return match;

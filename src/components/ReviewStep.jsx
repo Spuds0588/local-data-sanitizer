@@ -10,6 +10,22 @@ const TYPE_LABEL = {
   creditCardPartial: 'card digits',
   amount: 'amount',
   custom: 'keyword',
+  name: 'name',
+  account: 'account',
+  routing: 'routing',
+  iban: 'iban',
+  dob: 'dob',
+  address: 'address',
+  city: 'city',
+  state: 'state',
+  postalCode: 'postal',
+  taxId: 'tax id',
+  passport: 'passport',
+  license: 'license',
+  ipAddress: 'ip',
+  password: 'password',
+  apiKey: 'api key',
+  recordId: 'id',
 };
 
 export default function ReviewStep({ entries, enabledCount, status, downloads, onToggle, onSetFake, onSetAll, onSanitize }) {

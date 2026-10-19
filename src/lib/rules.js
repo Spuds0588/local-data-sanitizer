@@ -1,6 +1,7 @@
 // Standard regex detectors + custom keyword matching.
 
 import { parseAmount } from './jiggle.js';
+import { abaValid, einValid, ibanValid } from './identifiers.js';
 
 const CURRENCY_CODES = 'USD|EUR|GBP|JPY|CAD|AUD|CHF|INR|MXN|BRL';
 
@@ -47,6 +48,33 @@ export const RULE_DEFS = {
     caseInsensitive: false,
     pattern: /\b\d{3}-\d{2}-\d{4}\b/g,
   },
+  taxId: {
+    id: 'taxId',
+    label: 'Tax IDs (EIN)',
+    hint: '91-2837465 (EIN checked)',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /\b\d{2}-\d{7}\b/g,
+    validate: einValid,
+  },
+  iban: {
+    id: 'iban',
+    label: 'IBAN bank accounts',
+    hint: 'GB82 WEST 1234 5698 7654 32 (MOD-97 checked)',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b/g,
+    validate: ibanValid,
+  },
+  routing: {
+    id: 'routing',
+    label: 'Bank routing numbers (ABA)',
+    hint: '021000021 (checksum checked)',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /\b\d{9}\b/g,
+    validate: abaValid,
+  },
   creditCard: {
     id: 'creditCard',
     label: 'Credit card numbers',
@@ -71,6 +99,103 @@ export const RULE_DEFS = {
       /\blast\s+(?:four|4)\s+(?:digits|numbers?)(?:\s*(?:are|is|:|=|#|-))?\s*\d{4}(?!\d)/gi,
     ],
   },
+  labeledAccount: {
+    id: 'account',
+    label: 'Bank account numbers',
+    hint: 'Account Number: 884201553, acct #1234-5678',
+    priority: 2,
+    caseInsensitive: true,
+    pattern:
+      /(?<=(?:account|acct|a\/c)\s*(?:number|no\.?|num|#)?\s*(?:is|are)?\s*[:#=-]?\s*)\d[\d\s-]{4,19}\d/g,
+    validate: (value) => {
+      const digits = String(value).replace(/\D/g, '').length;
+      return digits >= 6 && digits <= 17;
+    },
+  },
+  labeledName: {
+    id: 'name',
+    label: 'Names after a label or table header',
+    hint: 'Customer: Jane Doe, beneficiary tables',
+    priority: 2,
+    caseInsensitive: false,
+    pattern:
+      /(?<=(?:full name|name|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|employer|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?)\s*[:#=-]?\s*)[A-Z][A-Za-z'’.-]+(?:\s+(?:[A-Z][A-Za-z'’.-]+|&)){1,3}/g,
+  },
+  labeledDob: {
+    id: 'dob',
+    label: 'Dates of birth',
+    hint: 'DOB: 04/17/1986, born 1986-04-17',
+    priority: 2,
+    caseInsensitive: true,
+    pattern:
+      /(?<=(?:dob|d\.o\.b\.?|date of birth|birth date|born)\s*[:#=-]?\s*)(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}[/.]\d{4})/g,
+  },
+  passport: {
+    id: 'passport',
+    label: 'Passport numbers',
+    hint: 'Passport No: 512345678',
+    priority: 2,
+    caseInsensitive: true,
+    pattern: /(?<=passport(?:\s*(?:number|no\.?|#))?\s*[:#=-]\s*)[A-Z0-9]{8,9}\b/g,
+  },
+  license: {
+    id: 'license',
+    label: "Driver's license numbers",
+    hint: 'DL: WDL-8842193',
+    priority: 2,
+    caseInsensitive: true,
+    pattern:
+      /(?<=(?:driver'?s?\s+licen[cs]e(?:\s*(?:number|no\.?|#))?|\bdl)\s*[:#=-]\s*)[A-Z0-9-]{6,16}\b/g,
+  },
+  ipAddress: {
+    id: 'ipAddress',
+    label: 'IP addresses',
+    hint: '203.0.113.42',
+    priority: 2,
+    caseInsensitive: false,
+    pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+    validate: (value) => value.split('.').every((octet) => Number(octet) <= 255),
+  },
+  password: {
+    id: 'password',
+    label: 'Passwords',
+    hint: 'Password: Winter2024!',
+    priority: 2,
+    caseInsensitive: true,
+    pattern: /(?<=(?:password|passwd|pwd)\s*[:=]\s*)[^\s,;]{6,}/g,
+  },
+  apiKey: {
+    id: 'apiKey',
+    label: 'API keys and tokens',
+    hint: 'sk-proj-…, AKIA…, ghp_…, xoxb-…, JWTs',
+    priority: 2,
+    caseInsensitive: false,
+    patterns: [
+      /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g,
+      /\bAKIA[0-9A-Z]{16}\b/g,
+      /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g,
+      /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
+      /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    ],
+  },
+  address: {
+    id: 'address',
+    label: 'Street addresses',
+    hint: '742 Evergreen Terrace, Springfield, IL 62704',
+    priority: 3,
+    caseInsensitive: false,
+    pattern:
+      /\b\d{1,5}\s+(?:[A-Z][A-Za-z'.-]+\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Parkway|Pkwy|Circle|Cir)\b(?:,?\s*(?:Apt|Suite|Ste|Unit|#)\s*[A-Za-z0-9-]+)?(?:,\s*[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)?/g,
+  },
+  labeledRecordId: {
+    id: 'recordId',
+    label: 'Account / user / transaction IDs',
+    hint: 'User ID: USR-88213, Transaction #TXN-88214',
+    priority: 3,
+    caseInsensitive: true,
+    pattern:
+      /(?<=(?:transaction|txn|reference|ref|confirmation|ticket|user|customer|member|employee|client)\s*(?:id|no\.?|number|#)?\s*[:#-]\s*)[A-Z]{1,6}[-_]?\d{3,12}\b/g,
+  },
   amount: {
     id: 'amount',
     label: 'Monetary amounts (±20% jiggle)',
@@ -79,7 +204,7 @@ export const RULE_DEFS = {
     caseInsensitive: false,
     patterns: [
       // Symbol amounts: $1,234.56, -$1,200.00, ($1,234.56)
-      /(?<![\w$€£¥₹])[-+]?\(?\s?[$€£¥₹]\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?\)?(?!\d)(?!\.\d)(?!,\d)/g,
+      /(?<![\w$€£¥₹])[-+]?\(?[$€£¥₹]\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?\)?(?!\d)(?!\.\d)(?!,\d)/g,
       // Currency-code amounts: USD 1,234.56, eur 2,000
       new RegExp(
         `\\b(?:${CURRENCY_CODES})\\s?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d{1,2})?(?!\\d)(?!\\.\\d)(?!,\\d)(?!\\s*%)`,
@@ -113,7 +238,27 @@ export const RULE_DEFS = {
 };
 
 export const DEFAULT_CONFIG = {
-  rules: { email: true, phone: true, ssn: true, creditCard: true, creditCardPartial: true, amount: true },
+  rules: {
+    email: true,
+    phone: true,
+    ssn: true,
+    taxId: true,
+    iban: true,
+    routing: true,
+    creditCard: true,
+    creditCardPartial: true,
+    account: true,
+    name: true,
+    dob: true,
+    passport: true,
+    license: true,
+    ipAddress: true,
+    password: true,
+    apiKey: true,
+    address: true,
+    recordId: true,
+    amount: true,
+  },
   customKeywords: [],
 };
 
@@ -167,7 +312,11 @@ export function detectInText(text, config = DEFAULT_CONFIG) {
 
   for (const def of active) {
     for (const pattern of def.patterns || [def.pattern]) {
-      const re = new RegExp(pattern.source, pattern.flags);
+      // Several rules are labelled lookbehinds: the label may be typed in any
+      // casing ("Date of birth", "DATE OF BIRTH"), the value is what matters.
+      const flags =
+        def.caseInsensitive && !pattern.flags.includes('i') ? `${pattern.flags}i` : pattern.flags;
+      const re = new RegExp(pattern.source, flags);
       let m;
       while ((m = re.exec(text)) !== null) {
         const start = m.index;

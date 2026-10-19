@@ -1,0 +1,4 @@
+ticket_id,created_at,channel,message,agent,customer_email
+TKT-4411,2024-02-03T14:22:00Z,email,"Hi, I'm Jane Doe. My card ending in 1111 was charged twice. Call me at (206) 555-0177 or jane.doe@example.com. My SSN is 123-45-6789 and my account number is 553100287. I live at 88 Cedar Hollow Lane, Portland, OR 97205. Password: Winter2024!",Dana Whitfield,jane.doe@example.com
+TKT-4412,2024-02-03T16:05:00Z,chat,"This is Marcus Webb (marcus.webb@example.com). Please update my address to 742 Evergreen Terrace, Springfield, IL 62704. My API key sk-proj-9f3a2b7c4d8e1f6a0b5c9d2e7f4a1b8c stopped working and my IP is 198.51.100.17.",Luis Ortega,marcus.webb@example.com
+TKT-4413,2024-02-04T09:41:00Z,email,"Robert Chen here — SSN 627-44-9018, DOB 08/23/1992. Wire to IBAN NL91ABNA0417164300. Thanks.",Dana Whitfield,robert.chen@example.com
