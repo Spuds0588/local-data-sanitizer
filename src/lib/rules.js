@@ -19,6 +19,18 @@ const NAME_PATTERN = "[\\p{Lu}][\\p{L}'’.-]+(?:[ \\t]+(?:[\\p{L}][\\p{L}'’.-
 // After a title every token must be capitalised: "Dr. Anna Weber is here" is
 // one name and one sentence, not a four-token name.
 const TITLED_NAME_PATTERN = "[\\p{Lu}][\\p{L}'’.-]+(?:[ \\t]+[\\p{Lu}][\\p{L}'’.-]+){0,3}";
+// Labels that introduce a person's name, as regex source. Sentence-start forms
+// are generated explicitly instead of using a case-insensitive flag: `i` also
+// case-folds `\p{Lu}` in the name pattern and would match lowercase prose.
+const NAME_LABELS =
+  'full name|name|my name is|i am|this is|signed by|attn\\.?|attention|care of|c\\/o|name of|belongs to|on behalf of|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?|patient|insured|member|tenant|landlord|physician|provider|guardian|parent|witness|signatory|sender|recipient|attendee|organizer|author|seller|buyer|prepared by|approved by';
+const capitalize = (label) => label.replace(/^[a-z]/, (c) => c.toUpperCase());
+const titleCase = (label) => label.replace(/(^|\s)([a-z])/g, (_, space, c) => space + c.toUpperCase());
+const SENTENCE_NAME_LABELS = [
+  ...NAME_LABELS.split('|').map(capitalize),
+  ...NAME_LABELS.split('|').map(titleCase),
+  ...NAME_LABELS.toUpperCase().split('|'),
+].join('|');
 
 export function digitCount(value) {
   return (String(value).match(/\d/g) || []).length;
@@ -157,24 +169,29 @@ export const RULE_DEFS = {
     caseInsensitive: false,
     patterns: [
       new RegExp(
-        '(?<=(?:full name|name|my name is|i am|this is|signed by|attn\\.?|attention|care of|c\\/o|name of|belongs to|on behalf of|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?|patient|insured|member|tenant|landlord|physician|provider|guardian|parent|witness|signatory|sender|recipient|attendee|organizer|author|seller|buyer|prepared by|approved by)\\s*[:#=-]?\\s*(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?)(?!(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\b)' +
+        '(?<=(?:' +
+          NAME_LABELS +
+          ')\\s*[:#=-]?\\s*(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?)(?!(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\b)' +
           NAME_PATTERN +
           '(?:,?\\s+(?:Jr|Sr|II|III|IV)\\.?)?',
         'gu',
       ),
-      // A sentence may start with the label ("Patient:", "Account Holder:").
-      // Case-folding is limited to the punctuation form, because without the
-      // colon a capitalised word in markup (`<crm:CustomerExport …>`) or in
-      // prose would be read as a label.
+      // A sentence may start with the label ("Patient:", "Account Holder:",
+      // "ACCOUNT HOLDER:"). Capitalised forms require the punctuation, so a
+      // capitalised word in markup (`<crm:CustomerExport …>`) is not a label.
       new RegExp(
-        '(?<=(?i:(?:full name|name|my name is|i am|this is|signed by|attn\\.?|attention|care of|c\\/o|name of|belongs to|on behalf of|customer|payee|employee|beneficiary|account holder|cardholder|applicant|contact|spouse|counterparty|transfer(?:red)? to|transfer(?:red)? from|paid to|received from|payroll|merchant|purchase(?: at)?|patient|insured|member|tenant|landlord|physician|provider|guardian|parent|witness|signatory|sender|recipient|attendee|organizer|author|seller|buyer|prepared by|approved by))\\s*[:#=-]\\s*(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?)(?!(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\b)' +
+        '(?<=(?:' +
+          SENTENCE_NAME_LABELS +
+          ')\\s*[:#=-]\\s*(?:(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\.?\\s+)?)(?!(?:Dr|Mr|Ms|Mrs|Prof|Rev)\\b)' +
           NAME_PATTERN +
           '(?:,?\\s+(?:Jr|Sr|II|III|IV)\\.?)?',
         'gu',
       ),
       // CRM/HR "Name: Doe, Jane" form.
       new RegExp(
-        '(?<=(?i:(?:full name|name|customer|payee|employee|beneficiary|contact|patient|insured|tenant|landlord|witness|signatory))\\s*[:#=-]\\s*)[\\p{Lu}][\\p{L}’\'.-]*,[ \\t]*[\\p{L}][\\p{L}’\'.-]*(?:[ \\t]+[\\p{L}][\\p{L}’\'.-]*){0,2}',
+        '(?<=(?:' +
+          SENTENCE_NAME_LABELS +
+          ')\\s*[:#=-]\\s*)[\\p{Lu}][\\p{L}’\'.-]*,[ \\t]*[\\p{L}][\\p{L}’\'.-]*(?:[ \\t]+[\\p{L}][\\p{L}’\'.-]*){0,2}',
         'gu',
       ),
     ],
