@@ -69,7 +69,8 @@ npm run build    # static output in dist/
   rights; if it fails, the run says so and you should set [Settings → Pages → Build and deployment → Source][pages-source] to
   **GitHub Actions** by hand. While it is set to *Deploy from a branch*, GitHub
   rebuilds the repo root on every push and serves `index.html` verbatim, which
-  points at the unbundled `/src/main.jsx` and renders a blank page.
+  points at the unbundled `/src/main.jsx` and renders a blank page until the
+  workflow's deploy replaces it a moment later.
 
 [pages-source]: https://github.com/Spuds0588/local-data-sanitizer/settings/pages
 - **Any static host:** `npm run build` produces a self-contained `dist/` folder.
